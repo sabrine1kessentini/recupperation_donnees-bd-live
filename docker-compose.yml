@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./back
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./Smart Building Management App (1)
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:4000
+    depends_on:
+      - backend
+    restart: unless-stopped

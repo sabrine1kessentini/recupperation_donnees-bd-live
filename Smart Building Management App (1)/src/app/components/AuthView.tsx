@@ -52,7 +52,7 @@ export function AuthView({ onAuthenticate }: AuthViewProps) {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    placeholder="********"
                     className="w-full bg-transparent outline-none text-zinc-700 placeholder:text-zinc-400"
                   />
                   <button

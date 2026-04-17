@@ -1,4 +1,4 @@
-import { LayoutDashboard, Zap, Thermometer, Bell, BarChart3, Building2, Users, Settings, ChevronDown, CalendarClock } from 'lucide-react';
+import { LayoutDashboard, Zap, Thermometer, Bell, BarChart3, Building2, Users, Settings, ChevronDown, CalendarClock, DoorOpen } from 'lucide-react';
 
 interface SidebarProps {
   activeView: string;
@@ -7,14 +7,15 @@ interface SidebarProps {
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const menuItems = [
-    { id: 'dashboard', icon: LayoutDashboard },
-    { id: 'energy', icon: Zap },
-    { id: 'environment', icon: Thermometer },
-    { id: 'occupancy', icon: Users },
-    { id: 'reservation', icon: CalendarClock },
-    { id: 'building', icon: Building2 },
-    { id: 'alerts', icon: Bell },
-    { id: 'analytics', icon: BarChart3 },
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'room-b109', icon: DoorOpen, label: 'Salle B109' },
+    { id: 'energy', icon: Zap, label: 'Energy' },
+    { id: 'environment', icon: Thermometer, label: 'Environment' },
+    { id: 'occupancy', icon: Users, label: 'Occupancy' },
+    { id: 'reservation', icon: CalendarClock, label: 'Reservation' },
+    { id: 'building', icon: Building2, label: 'Building' },
+    { id: 'alerts', icon: Bell, label: 'Alerts' },
+    { id: 'analytics', icon: BarChart3, label: 'Analytics' },
   ];
 
   return (
@@ -33,6 +34,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
+              title={item.label}
               className={`
                 size-11 rounded-2xl transition-all duration-200 grid place-items-center
                 ${isActive

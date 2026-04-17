@@ -9,6 +9,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { OccupancyView } from './components/OccupancyView';
 import { AuthView } from './components/AuthView';
 import { ReservationView } from './components/ReservationView';
+import { RoomView } from './components/RoomView';
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -17,7 +18,9 @@ export default function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView />;
+        return <DashboardView onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
+      case 'room-b109':
+        return <RoomView roomName="B109" onBack={() => setActiveView('dashboard')} />;
       case 'energy':
         return <EnergyView />;
       case 'environment':
@@ -33,7 +36,7 @@ export default function App() {
       case 'reservation':
         return <ReservationView />;
       default:
-        return <DashboardView />;
+        return <DashboardView onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
     }
   };
 

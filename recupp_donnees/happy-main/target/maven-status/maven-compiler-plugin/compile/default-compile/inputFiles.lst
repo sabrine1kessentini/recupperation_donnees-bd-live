@@ -3,6 +3,8 @@ C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\config\FusionApiClientConfig.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\config\JacksonConfig.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\config\KafkaConfig.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\config\WebMvcConfig.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\config\WebSocketConfig.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\controller\BuildingController.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\BuildingStructure.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\Equipment.java

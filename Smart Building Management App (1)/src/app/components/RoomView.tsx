@@ -88,7 +88,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
 
   useEffect(() => {
     fetchRoomData();
-    const intervalId = window.setInterval(fetchRoomData, 5 * 60 * 1000);
+    const intervalId = window.setInterval(fetchRoomData, 30 * 1000); // Refresh every 30 seconds
     return () => window.clearInterval(intervalId);
   }, [roomName]);
 

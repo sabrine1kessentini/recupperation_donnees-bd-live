@@ -5,6 +5,7 @@ import {
   Lightbulb, Lock, Snowflake, Square, Sun, Thermometer, Wind, Zap, RefreshCw
 } from 'lucide-react';
 import { getWaveonSession, getAllRecentMeasurements, type SensorMeasurement, type WaveonSession } from '../../services/api';
+import { useSensorWebSocket, type SensorReading } from '../../services/websocket';
 
 type WeatherData = {
   temperature: number;
@@ -30,6 +31,39 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  // WebSocket connection for real-time sensor data
+  const { isConnected, allReadings } = useSensorWebSocket({
+    // roomName: 'B109', // Filter disabled - show all rooms for now
+  });
+
+  // Update measurements from WebSocket readings
+  useEffect(() => {
+    if (allReadings.length > 0) {
+      const wsMeasurements: SensorMeasurement[] = allReadings.map((reading) => ({
+        sensorId: reading.sensorId,
+        sensorType: reading.sensorType,
+        label: reading.label,
+        timestamp: reading.measuredAt,
+        value: reading.value,
+        unit: reading.unit,
+        status: reading.status,
+        ifcGlobalId: reading.ifcGlobalId,
+        roomName: reading.roomName,
+      }));
+      setMeasurements((prev) => {
+        // Merge with existing measurements, preferring newer values
+        const merged = [...wsMeasurements];
+        prev.forEach((existing) => {
+          if (!merged.find((m) => m.sensorId === existing.sensorId)) {
+            merged.push(existing);
+          }
+        });
+        return merged;
+      });
+      setLastRefresh(new Date());
+    }
+  }, [allReadings]);
 
   // Fetch météo (Node.js backend)
   useEffect(() => {
@@ -81,7 +115,7 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
 
   useEffect(() => {
     fetchSensorData();
-    const id = window.setInterval(fetchSensorData, 5 * 60 * 1000); // refresh every 5 min
+    const id = window.setInterval(fetchSensorData, 30 * 1000); // refresh every 30 seconds
     return () => window.clearInterval(id);
   }, []);
 
@@ -151,6 +185,12 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
               Session WaveOn — Mode: {session.mode} · Client #{session.idclient}
             </p>
           )}
+          <p className="text-xs mt-1">
+            WebSocket: <span className={isConnected ? 'text-green-600' : 'text-red-500'}>
+              {isConnected ? 'Connecté' : 'Déconnecté'}
+            </span>
+            {isConnected && <span className="text-zinc-400"> · {allReadings.length} messages reçus</span>}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-72 rounded-full bg-white/70 px-4 py-2 text-sm text-zinc-500">

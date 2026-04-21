@@ -104,7 +104,9 @@ export const getWaveonSession = (): Promise<WaveonSession> =>
 export const getRealtimeData = (sensorId: string): Promise<SensorMeasurement[]> =>
   get(`/api/realtime?sensorId=${encodeURIComponent(sensorId)}`);
 
-/** Historique d'un capteur sur une fenetre glissante */
+export const getAllRealtimeData = (): Promise<SensorMeasurement[]> =>
+  get('/api/realtime');
+
 export const getSensorHistory = (
   sensorId: string,
   hours = 24,

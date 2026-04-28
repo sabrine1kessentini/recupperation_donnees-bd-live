@@ -116,7 +116,7 @@ export const getSensorHistory = (
 
 /** Hiérarchie complète du bâtiment (sites → buildings → floors → zones) */
 export const getBuildingHierarchy = (): Promise<SiteHierarchyDto[]> =>
-  get('/api/building/hierarchy');
+  get('/api/buildings/hierarchy');
 
 /** Toutes les mesures récentes (tous capteurs) */
 export const getAllRecentMeasurements = (): Promise<SensorMeasurement[]> =>

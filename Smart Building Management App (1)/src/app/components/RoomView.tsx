@@ -23,7 +23,7 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  getAllRecentMeasurements,
+  getAllRealtimeData,
   getSensorHistory,
   getSpaces,
   type SensorHistorySeries,
@@ -55,7 +55,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
     try {
       const [spaces, recentMeasurements] = await Promise.all([
         getSpaces(),
-        getAllRecentMeasurements(),
+        getAllRealtimeData(),
       ]);
 
       const currentRoom = spaces.find((space) => space.ifcName === roomName) ?? null;
@@ -80,7 +80,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
 
       setHistoryByType(nextHistoryByType);
     } catch {
-      setError('Impossible de charger les donnees de la salle B109 depuis Spring Boot (port 8084).');
+      setError('Impossible de charger les donnees de la salle depuis Spring Boot (port 8084).');
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +88,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
 
   useEffect(() => {
     fetchRoomData();
-    const intervalId = window.setInterval(fetchRoomData, 30 * 1000); // Refresh every 30 seconds
+    const intervalId = window.setInterval(fetchRoomData, 5000); // Rafraichir toutes les 5 secondes
     return () => window.clearInterval(intervalId);
   }, [roomName]);
 

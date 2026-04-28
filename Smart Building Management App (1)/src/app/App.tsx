@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { DashboardView } from './components/DashboardView';
+import  DashboardView  from './components/DashboardView';
 import { EnergyView } from './components/EnergyView';
 import { EnvironmentView } from './components/EnvironmentView';
 import { BuildingView } from './components/BuildingView';

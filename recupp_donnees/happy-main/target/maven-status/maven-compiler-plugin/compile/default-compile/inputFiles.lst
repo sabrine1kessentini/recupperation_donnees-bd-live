@@ -28,6 +28,7 @@ C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\TelemetryPointDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\ZoneDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\init\DataInitializer.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\kafka\RealtimeSensorService.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\kafka\SensorDataConsumer.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\kafka\SensorDataProducer.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\kafka\SensorPollingScheduler.java

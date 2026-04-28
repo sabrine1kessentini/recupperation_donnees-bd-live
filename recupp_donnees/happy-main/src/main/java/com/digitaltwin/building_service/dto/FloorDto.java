@@ -11,11 +11,12 @@ import java.util.List;
 @AllArgsConstructor
 public class FloorDto {
 
-    private Long floorId;
+    private Long id;
 
-    private String floorName;
+    private String name;
 
-    private String globalId;
+    private Integer levelIndex;
 
-    private List<RoomDto> rooms;
+    private List<ZoneDto> zones;
+
 }

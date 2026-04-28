@@ -20,64 +20,53 @@ public class HierarchyService {
     private final EquipmentRepository equipmentRepository;
 
     public SiteHierarchyDto getHierarchy() {
-        SiteHierarchyDto siteDto = new SiteHierarchyDto();
-        siteDto.setSiteName("IFC Site");
-
         List<Site> sites = siteRepository.findAll();
-        if (sites.isEmpty()) {
-            return siteDto;
+        SiteHierarchyDto siteDto = new SiteHierarchyDto();
+        if (!sites.isEmpty()) {
+            Site first = sites.get(0);
+            siteDto.setId(first.getId());
+            siteDto.setName(first.getName());
+            siteDto.setLocation(first.getLocation());
+        } else {
+            siteDto.setName("IFC Site");
+            siteDto.setLocation("");
         }
 
         List<BuildingHierarchyDto> buildingDtos = new ArrayList<>();
 
         for (Site site : sites) {
-            siteDto.setSiteName(site.getName());
-            
             for (BuildingStructure building : site.getBuildings()) {
                 BuildingHierarchyDto buildingDto = new BuildingHierarchyDto();
-                buildingDto.setBuildingId(building.getId());
-                buildingDto.setBuildingName(building.getName());
-                buildingDto.setGlobalId(building.getCode());
+                buildingDto.setId(building.getId());
+                buildingDto.setName(building.getName());
+                buildingDto.setCode(building.getCode());
 
                 List<FloorDto> floorDtos = new ArrayList<>();
                 for (Floor floor : building.getFloors()) {
                     FloorDto floorDto = new FloorDto();
-                    floorDto.setFloorId(floor.getId());
-                    floorDto.setFloorName(floor.getName());
-                    floorDto.setGlobalId(String.valueOf(floor.getLevelIndex()));
+                    floorDto.setId(floor.getId());
+                    floorDto.setName(floor.getName());
+                    floorDto.setLevelIndex(floor.getLevelIndex());
 
-                    List<RoomDto> roomDtos = new ArrayList<>();
+                    List<ZoneDto> zoneDtos = new ArrayList<>();
                     for (Zone zone : floor.getZones()) {
-                        RoomDto roomDto = new RoomDto(
+                        ZoneDto zoneDto = new ZoneDto(
                                 zone.getId(),
                                 zone.getName(),
                                 zone.getType(),
-                                "IFCSPACE",
-                                new ArrayList<>()
+                                zone.getEquipments().stream()
+                                        .map(eq -> new EquipmentDto(
+                                                eq.getId(),
+                                                eq.getName(),
+                                                eq.getCategory(),
+                                                eq.getIfcGlobalId()
+                                        ))
+                                        .toList()
                         );
-
-                        List<EquipmentDto> equipmentDtos = new ArrayList<>();
-                        for (Equipment equipment : zone.getEquipments()) {
-                            EquipmentDto equipmentDto = new EquipmentDto(
-                                    equipment.getId(),
-                                    equipment.getName(),
-                                    equipment.getCategory(),
-                                    equipment.getIfcGlobalId()
-                            );
-                            equipmentDtos.add(equipmentDto);
-                        }
-
-                        roomDto = new RoomDto(
-                                roomDto.id(),
-                                roomDto.name(),
-                                roomDto.globalId(),
-                                roomDto.type(),
-                                equipmentDtos
-                        );
-                        roomDtos.add(roomDto);
+                        zoneDtos.add(zoneDto);
                     }
 
-                    floorDto.setRooms(roomDtos);
+                    floorDto.setZones(zoneDtos);
                     floorDtos.add(floorDto);
                 }
 
@@ -96,9 +85,10 @@ public class HierarchyService {
         for (Site site : siteRepository.findAll()) {
             for (BuildingStructure building : site.getBuildings()) {
                 BuildingHierarchyDto dto = new BuildingHierarchyDto();
-                dto.setBuildingId(building.getId());
-                dto.setBuildingName(building.getName());
-                dto.setGlobalId(building.getCode());
+                dto.setId(building.getId());
+                dto.setName(building.getName());
+                dto.setCode(building.getCode());
+                dto.setFloors(new ArrayList<>()); // empty list since floors not loaded
                 buildings.add(dto);
             }
         }
@@ -111,9 +101,10 @@ public class HierarchyService {
         
         for (Floor floor : floorRepository.findAll()) {
             FloorDto dto = new FloorDto();
-            dto.setFloorId(floor.getId());
-            dto.setFloorName(floor.getName());
-            dto.setGlobalId(String.valueOf(floor.getLevelIndex()));
+            dto.setId(floor.getId());
+            dto.setName(floor.getName());
+            dto.setLevelIndex(floor.getLevelIndex());
+            dto.setZones(new ArrayList<>()); // zones not loaded in this endpoint
             floors.add(dto);
         }
 
@@ -124,12 +115,21 @@ public class HierarchyService {
         List<RoomDto> rooms = new ArrayList<>();
         
         for (Zone zone : zoneRepository.findAll()) {
+            List<EquipmentDto> equipmentDtos = zone.getEquipments().stream()
+                    .map(eq -> new EquipmentDto(
+                            eq.getId(),
+                            eq.getName(),
+                            eq.getCategory(),
+                            eq.getIfcGlobalId()
+                    ))
+                    .toList();
+            
             RoomDto dto = new RoomDto(
                     zone.getId(),
                     zone.getName(),
+                    "IFCSPACE", // globalId placeholder (IFC space identifier)
                     zone.getType(),
-                    "IFCSPACE",
-                    new ArrayList<>()
+                    equipmentDtos
             );
             rooms.add(dto);
         }

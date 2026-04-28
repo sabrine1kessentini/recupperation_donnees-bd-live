@@ -11,11 +11,11 @@ import java.util.List;
 @AllArgsConstructor
 public class SiteHierarchyDto {
 
-    private Long siteId;
+    private Long id;
 
-    private String siteName;
+    private String name;
 
-    private String code;
+    private String location;
 
     private List<BuildingHierarchyDto> buildings;
 

@@ -44,96 +44,98 @@ export function useSensorWebSocket({
     setLastReading(null);
   }, []);
 
-  useEffect(() => {
-    let stompClient: any = null;
+   useEffect(() => {
+     let isDisposed = false;
 
-    const connect = async () => {
-      try {
-        console.log(
-          'Attempting WebSocket connection to:',
-          `${SPRING_URL}/ws`
-        );
+     const connect = async () => {
+       try {
+         console.log(
+           'Attempting WebSocket connection to:',
+           `${SPRING_URL}/ws`
+         );
 
-        const SockJS = (await import('sockjs-client')).default;
-        const Stomp = await import('@stomp/stompjs');
+         const SockJS = (await import('sockjs-client')).default;
+         const Stomp = await import('@stomp/stompjs');
 
-        stompClient = new Stomp.Client({
-          webSocketFactory: () => {
-            console.log('Creating SockJS connection...');
-            return new SockJS(`${SPRING_URL}/ws`);
-          },
+         const stompClient = new Stomp.Client({
+           webSocketFactory: () => {
+             console.log('Creating SockJS connection...');
+             return new SockJS(`${SPRING_URL}/ws`);
+           },
 
-          reconnectDelay: 5000,
-          heartbeatIncoming: 0,
-          heartbeatOutgoing: 0,
+           reconnectDelay: 5000,
+           heartbeatIncoming: 0,
+           heartbeatOutgoing: 0,
 
-          onConnect: () => {
-            setIsConnected(true);
-            console.log('✅ WebSocket connected successfully');
+           onConnect: () => {
+             setIsConnected(true);
+             console.log('✅ WebSocket connected successfully');
 
-            const subscription = stompClient.subscribe(
-              '/topic/sensor-readings',
-              (message: any) => {
-                try {
-                  const data: SensorReading = JSON.parse(
-                    message.body
-                  );
+             const subscription = stompClient.subscribe(
+               '/topic/sensor-data',
+               (message: any) => {
+                 try {
+                   const data: SensorReading = JSON.parse(
+                     message.body
+                   );
 
-                  // Filter by room
-                  if (roomName && data.roomName !== roomName) {
-                    return;
-                  }
+                   // Filter by room
+                   if (roomName && data.roomName !== roomName) {
+                     return;
+                   }
 
-                  setLastReading(data);
+                   setLastReading(data);
 
-                  setAllReadings((prev) => {
-                    const newReadings = [...prev, data];
-                    return newReadings.slice(-100);
-                  });
+                   setAllReadings((prev) => {
+                     const newReadings = [...prev, data];
+                     return newReadings.slice(-100);
+                   });
 
-                  onMessage?.(data);
-                } catch (e) {
-                  console.error('❌ Parse error:', e);
-                }
-              }
-            );
+                   onMessage?.(data);
+                 } catch (e) {
+                   console.error('❌ Parse error:', e);
+                 }
+               }
+             );
 
-            subscriptionsRef.current.push(subscription);
-          },
+             subscriptionsRef.current.push(subscription);
+           },
 
-          onDisconnect: () => {
-            setIsConnected(false);
-            console.log('⚠️ WebSocket disconnected');
-          },
+           onDisconnect: () => {
+             setIsConnected(false);
+             console.log('⚠️ WebSocket disconnected');
+           },
 
-          onStompError: (frame: any) => {
-            console.error('❌ STOMP error:', frame.headers.message);
-          },
+           onStompError: (frame: any) => {
+             console.error('❌ STOMP error:', frame.headers.message);
+           },
 
-          onWebSocketError: (error: any) => {
-            console.error('❌ WebSocket error:', error);
-          },
-        });
+           onWebSocketError: (error: any) => {
+             console.error('❌ WebSocket error:', error);
+           },
+         });
 
-        clientRef.current = stompClient;
-        stompClient.activate();
-      } catch (error) {
-        console.error('❌ Failed to connect:', error);
-      }
-    };
+         clientRef.current = stompClient;
+         stompClient.activate();
+       } catch (error) {
+         console.error('❌ Failed to connect:', error);
+       }
+     };
 
-    connect();
+     connect();
 
-    return () => {
-      subscriptionsRef.current.forEach((sub) => {
-        if (sub) sub.unsubscribe();
-      });
+     return () => {
+       isDisposed = true;
+       subscriptionsRef.current.forEach((sub) => {
+         if (sub) sub.unsubscribe();
+       });
 
-      if (stompClient) {
-        stompClient.deactivate();
-      }
-    };
-  }, [roomName, onMessage]);
+       const client = clientRef.current;
+       if (client) {
+         client.deactivate();
+       }
+     };
+   }, [roomName, onMessage]);
 
   return {
     isConnected,

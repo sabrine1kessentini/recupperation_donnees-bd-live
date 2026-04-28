@@ -4,7 +4,7 @@ public record EquipmentDto(
         Long id,
         String name,
         String category,
-        String ifcGlobalId
+        String globalId
 ) {
 }
 

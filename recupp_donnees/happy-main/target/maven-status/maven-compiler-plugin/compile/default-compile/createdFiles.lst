@@ -47,6 +47,7 @@ com\digitaltwin\building_service\dto\SensorDataDto.class
 com\digitaltwin\building_service\service\WaveonFusionService$WaveonSession.class
 com\digitaltwin\building_service\dto\RealtimeMeasurementDto.class
 com\digitaltwin\building_service\service\IfcService.class
+com\digitaltwin\building_service\kafka\RealtimeSensorService.class
 com\digitaltwin\building_service\dto\SensorDetailsDto.class
 com\digitaltwin\building_service\service\WaveonFusionService$SensorDefinition.class
 com\digitaltwin\building_service\repository\BuildingStructureRepository.class

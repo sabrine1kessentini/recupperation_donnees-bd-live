@@ -28,32 +28,38 @@ public class SensorDataConsumer {
     }
 
     @KafkaListener(
-            topics = "${building.kafka.topic:building.sensor.readings}",
-            groupId = "${spring.kafka.consumer.group-id:building-service-group}"
-    )
-    public void consume(SensorReadingEvent event) {
-        log.debug("Received sensor reading: sensorId={}, type={}, value={}",
-                event.sensorId(), event.sensorType(), event.value());
-        try {
-            SensorMeasurement measurement = new SensorMeasurement(
-                    event.sensorId(),
-                    event.sensorType(),
-                    event.label(),
-                    event.ifcGlobalId(),
-                    event.roomName(),
-                    event.unit(),
-                    event.value(),
-                    event.status(),
-                    event.measuredAt(),
-                    Instant.now()
-            );
-            repository.save(measurement);
+        topics = "${building.kafka.topic:building.sensor.readings}",
+        groupId = "${spring.kafka.consumer.group-id:building-service-group}"
+)
+public void consume(SensorReadingEvent event) {
 
-            // Broadcast to WebSocket
-            messagingTemplate.convertAndSend("/topic/sensor-readings", event);
-            log.debug("Broadcast sensor reading via WebSocket: sensorId={}", event.sensorId());
-        } catch (Exception e) {
-            log.error("Failed to persist sensor measurement sensorId={}: {}", event.sensorId(), e.getMessage());
-        }
+    log.debug("Received sensor reading: sensorId={}, type={}, value={}",
+            event.sensorId(), event.sensorType(), event.value());
+
+        try {
+            // 1. Sauvegarde dans PostgreSQL
+            SensorMeasurement m = new SensorMeasurement(
+                event.sensorId(),
+                event.sensorType(),
+                event.label(),
+                event.ifcGlobalId(),
+                event.roomName(),
+                event.unit(),
+                event.value(),
+                event.status(),
+                event.measuredAt(),
+                Instant.now()
+            );
+
+            repository.save(m);
+
+        // 2. Envoi WebSocket (temps réel)
+        messagingTemplate.convertAndSend("/topic/sensor-data", event);
+
+        log.debug("Sensor saved & broadcasted: {}", event.sensorId());
+
+    } catch (Exception e) {
+        log.error("Error while processing sensorId={}: {}", event.sensorId(), e.getMessage(), e);
     }
+}
 }

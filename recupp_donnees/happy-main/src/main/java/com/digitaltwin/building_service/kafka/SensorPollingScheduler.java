@@ -23,11 +23,11 @@ public class SensorPollingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(SensorPollingScheduler.class);
 
-    private final WaveonFusionService fusionService;
+    private final WaveonFusionService waveonFusionService;
     private final SensorDataProducer producer;
 
-    public SensorPollingScheduler(WaveonFusionService fusionService, SensorDataProducer producer) {
-        this.fusionService = fusionService;
+    public SensorPollingScheduler(WaveonFusionService waveonFusionService, SensorDataProducer producer) {
+        this.waveonFusionService = waveonFusionService;
         this.producer = producer;
     }
 
@@ -38,8 +38,8 @@ public class SensorPollingScheduler {
     public void pollAndPublish() {
         log.info("Polling WaveOn sensor data...");
         try {
-            // getRealtime(null) fetches the latest reading for every mapped sensor
-            List<RealtimeMeasurementDto> measurements = fusionService.getRealtime(null);
+            // Call service directly instead of HTTP self-call
+            List<RealtimeMeasurementDto> measurements = waveonFusionService.getRealtime(null);
 
             int published = 0;
             for (RealtimeMeasurementDto m : measurements) {
@@ -47,7 +47,7 @@ public class SensorPollingScheduler {
                     continue;
                 }
                 Instant measuredAt = m.timestamp() != null ? m.timestamp() : Instant.now();
-                producer.send(new SensorReadingEvent(
+                SensorReadingEvent event = new SensorReadingEvent(
                         m.sensorId(),
                         m.sensorType(),
                         m.label(),
@@ -57,7 +57,8 @@ public class SensorPollingScheduler {
                         m.value(),
                         m.status(),
                         measuredAt
-                ));
+                );
+                producer.send(event);
                 published++;
             }
             log.info("Published {}/{} sensor readings to Kafka", published, measurements.size());

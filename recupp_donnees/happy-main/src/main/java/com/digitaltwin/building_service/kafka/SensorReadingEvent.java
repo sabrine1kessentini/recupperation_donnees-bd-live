@@ -2,6 +2,7 @@ package com.digitaltwin.building_service.kafka;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 
 import java.time.Instant;
 
@@ -64,4 +65,26 @@ public class SensorReadingEvent {
     public Double value() { return value; }
     public String status() { return status; }
     public Instant measuredAt() { return measuredAt; }
+
+    // Setter for deserialization
+    public void setSensorId(String sensorId) { this.sensorId = sensorId; }
+    public void setSensorType(String sensorType) { this.sensorType = sensorType; }
+    public void setLabel(String label) { this.label = label; }
+    public void setIfcGlobalId(String ifcGlobalId) { this.ifcGlobalId = ifcGlobalId; }
+    public void setRoomName(String roomName) { this.roomName = roomName; }
+    public void setUnit(String unit) { this.unit = unit; }
+    public void setValue(Double value) { this.value = value; }
+    public void setStatus(String status) { this.status = status; }
+
+    // Flexible setter for measuredAt (handles different formats: ISO string, epoch seconds, null)
+    @JsonSetter("measuredAt")
+    public void setMeasuredAtFlexible(Object raw) {
+        if (raw == null) {
+            this.measuredAt = Instant.now();
+        } else if (raw instanceof Number num) {
+            this.measuredAt = Instant.ofEpochSecond(num.longValue());
+        } else {
+            this.measuredAt = Instant.parse(raw.toString());
+        }
+    }
 }

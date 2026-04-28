@@ -63,4 +63,13 @@ public class SensorMeasurement {
     public String getStatus() { return status; }
     public Instant getMeasuredAt() { return measuredAt; }
     public Instant getRecordedAt() { return recordedAt; }
+
+    /**
+     * Alias for measuredAt to match frontend expectation.
+     * Jackson will serialize this as "timestamp" in JSON.
+     */
+    @jakarta.persistence.Transient
+    public Instant getTimestamp() {
+        return measuredAt;
+    }
 }

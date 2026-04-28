@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Thermometer, Droplets, Wind, Gauge, RefreshCw, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getAllRecentMeasurements, type SensorMeasurement } from '../../services/api';
+import { getAllRealtimeData } from '../../services/api';
 
 type ZoneSummary = {
   name: string;
@@ -11,7 +11,7 @@ type ZoneSummary = {
 };
 
 export function EnvironmentView() {
-  const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
+  const [measurements, setMeasurements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,8 +19,9 @@ export function EnvironmentView() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getAllRecentMeasurements();
-      setMeasurements(data);
+      // Utiliser les données temps réel pour avoir les dernières valeurs
+      const realtimeData = await getAllRealtimeData();
+      setMeasurements(realtimeData);
     } catch {
       setError('Impossible de charger les données environnementales (Spring Boot port 8084)');
     } finally {
@@ -30,7 +31,8 @@ export function EnvironmentView() {
 
   useEffect(() => {
     fetchData();
-    const id = window.setInterval(fetchData, 5 * 60 * 1000);
+    // Rafraîchir toutes les 5 secondes pour avoir un quasi temps réel
+    const id = window.setInterval(fetchData, 5000);
     return () => window.clearInterval(id);
   }, []);
 

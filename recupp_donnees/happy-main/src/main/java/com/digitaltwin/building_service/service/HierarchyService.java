@@ -14,7 +14,6 @@ import java.util.List;
 public class HierarchyService {
 
     private final SiteRepository siteRepository;
-    private final BuildingStructureRepository buildingStructureRepository;
     private final FloorRepository floorRepository;
     private final ZoneRepository zoneRepository;
     private final EquipmentRepository equipmentRepository;

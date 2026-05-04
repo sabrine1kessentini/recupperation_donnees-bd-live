@@ -8,6 +8,7 @@ interface SidebarProps {
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'dashboard-occupant', icon: LayoutDashboard, label: 'DashboardOccupant' },
     { id: 'room-b109', icon: DoorOpen, label: 'Salle B109' },
     { id: 'energy', icon: Zap, label: 'Energy' },
     { id: 'environment', icon: Thermometer, label: 'Environment' },

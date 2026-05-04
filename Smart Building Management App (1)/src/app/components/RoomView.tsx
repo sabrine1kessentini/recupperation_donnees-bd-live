@@ -22,8 +22,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useRealtimeData } from '../../hooks/useRealtimeData';
 import {
-  getAllRealtimeData,
   getSensorHistory,
   getSpaces,
   type SensorHistorySeries,
@@ -43,54 +43,53 @@ type ChartPoint = {
 
 export function RoomView({ roomName, onBack }: RoomViewProps) {
   const [room, setRoom] = useState<SpaceSensorDto | null>(null);
-  const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
-  const [historyByType, setHistoryByType] = useState<Record<string, SensorHistorySeries>>({});
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRoomData = async () => {
-    setIsLoading(true);
-    setError(null);
+  // WebSocket realtime data hook
+  const { latest: realtimeData, connected } = useRealtimeData(100);
 
+  // Filter realtime measurements for this specific room
+  const measurements = useMemo(
+    () => realtimeData.filter((m) => m.roomName === roomName),
+    [realtimeData, roomName]
+  );
+
+  const [historyByType, setHistoryByType] = useState<Record<string, SensorHistorySeries>>({});
+
+  const loadRoomInfo = async () => {
     try {
-      const [spaces, recentMeasurements] = await Promise.all([
-        getSpaces(),
-        getAllRealtimeData(),
-      ]);
-
+      const spaces = await getSpaces();
       const currentRoom = spaces.find((space) => space.ifcName === roomName) ?? null;
       setRoom(currentRoom);
-
-      const roomMeasurements = recentMeasurements.filter((measurement) => measurement.roomName === roomName);
-      setMeasurements(roomMeasurements);
-
-      const historyEntries = await Promise.all(
-        (currentRoom?.sensors ?? []).map(async (sensor) => {
-          const series = await getSensorHistory(sensor.id, 24, 24);
-          return series[0] ?? null;
-        }),
-      );
-
-      const nextHistoryByType = historyEntries.reduce<Record<string, SensorHistorySeries>>((acc, series) => {
-        if (series) {
-          acc[series.sensorType] = series;
-        }
-        return acc;
-      }, {});
-
-      setHistoryByType(nextHistoryByType);
     } catch {
       setError('Impossible de charger les donnees de la salle depuis Spring Boot (port 8084).');
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  const loadHistory = async () => {
+    if (!room?.sensors.length) return;
+    const historyEntries = await Promise.all(
+      room.sensors.map(async (sensor) => {
+        const series = await getSensorHistory(sensor.id, 24, 24);
+        return series[0] ?? null;
+      }),
+    );
+    const next = historyEntries.reduce<Record<string, SensorHistorySeries>>((acc, series) => {
+      if (series) acc[series.sensorType] = series;
+      return acc;
+    }, {});
+    setHistoryByType(next);
+  };
+
   useEffect(() => {
-    fetchRoomData();
-    const intervalId = window.setInterval(fetchRoomData, 5000); // Rafraichir toutes les 5 secondes
-    return () => window.clearInterval(intervalId);
+    loadRoomInfo();
   }, [roomName]);
+
+  useEffect(() => {
+    loadHistory();
+    const intervalId = window.setInterval(loadHistory, 30000);
+    return () => window.clearInterval(intervalId);
+  }, [room]);
 
   const measurementsByType = useMemo(() => {
     return measurements.reduce<Record<string, SensorMeasurement>>((acc, measurement) => {
@@ -104,7 +103,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
   const humidity = measurementsByType.humidity?.value ?? null;
   const energy = measurementsByType.energy?.value ?? null;
   const occupancy = measurementsByType.occupancy?.value ?? null;
-  const alertCount = measurements.filter((measurement) => measurement.status !== 'OK').length;
+  const alertCount = measurements.filter((m) => m.status !== 'OK').length;
 
   const buildChartData = (series?: SensorHistorySeries): ChartPoint[] => {
     if (!series) return [];
@@ -125,6 +124,12 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
   return (
     <div className="min-h-full p-6 bg-[radial-gradient(circle_at_top_left,#f7f4ed_0,#ece5d6_38%,#e7ebef_100%)]">
       <div className="mx-auto max-w-7xl space-y-6">
+        {connected && (
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-sm text-green-600">Temps reel actif via WebSocket</span>
+          </div>
+        )}
         <header className="rounded-[32px] border border-white/80 bg-white/70 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-4">
@@ -151,10 +156,10 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
                 <p className="mt-1 font-medium">{room?.ifcLongName || 'Conference Room 3'}</p>
               </div>
               <button
-                onClick={fetchRoomData}
+                onClick={loadRoomInfo}
                 className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm text-white transition hover:bg-zinc-800"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className="h-4 w-4" />
                 Rafraichir
               </button>
             </div>
@@ -278,7 +283,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
                 })}
               </div>
 
-              {!isLoading && (room?.sensors ?? []).length === 0 && (
+              {(room?.sensors ?? []).length === 0 && (
                 <p className="text-sm text-zinc-500">Aucun capteur mappe pour cette salle.</p>
               )}
             </div>

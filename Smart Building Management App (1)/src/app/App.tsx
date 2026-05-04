@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import  DashboardView  from './components/DashboardView';
+import { DashboardViewOccupant }   from './components/DashboardViewOccupant';
 import { EnergyView } from './components/EnergyView';
 import { EnvironmentView } from './components/EnvironmentView';
 import { BuildingView } from './components/BuildingView';
@@ -19,6 +20,8 @@ export default function App() {
     switch (activeView) {
       case 'dashboard':
         return <DashboardView onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
+      case 'dashboard-occupant':
+        return <DashboardViewOccupant onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
       case 'room-b109':
         return <RoomView roomName="B109" onBack={() => setActiveView('dashboard')} />;
       case 'energy':

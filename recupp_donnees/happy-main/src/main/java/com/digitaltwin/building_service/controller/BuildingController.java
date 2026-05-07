@@ -197,9 +197,9 @@ public class BuildingController {
 
         percentageChange = Math.round(percentageChange * 10.0) / 10.0;
 
-        Double currentPeak = sensorMeasurementRepository.findMaxValueBySensorTypeAndMeasuredAtBetween(
+        Double currentPeak = sensorMeasurementRepository.findMaxDailyEnergyConsumption(
                 "energy", weekStart, now);
-        Double previousPeak = sensorMeasurementRepository.findMaxValueBySensorTypeAndMeasuredAtBetween(
+        Double previousPeak = sensorMeasurementRepository.findMaxDailyEnergyConsumption(
                 "energy", twoWeeksAgo, weekStart);
 
         currentPeak = currentPeak != null ? currentPeak : 0.0;
@@ -224,6 +224,24 @@ public class BuildingController {
                 peakPercentageChange
         );
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/measurements/energy-by-room")
+    public ResponseEntity<List<RoomEnergyConsumptionDto>> getEnergyByRoom() {
+        Instant now = Instant.now();
+        Instant weekStart = now.minus(7, java.time.temporal.ChronoUnit.DAYS);
+
+        List<Object[]> results = sensorMeasurementRepository.sumValueByRoomAndSensorTypeBetween(
+                "energy", weekStart, now);
+
+        List<RoomEnergyConsumptionDto> roomConsumption = results.stream()
+                .map(row -> new RoomEnergyConsumptionDto(
+                        (String) row[0],
+                        ((Number) row[1]).doubleValue() / 1000.0  // Convert Wh to kWh
+                ))
+                .toList();
+
+        return ResponseEntity.ok(roomConsumption);
     }
 
     /**

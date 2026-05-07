@@ -3,7 +3,6 @@ com\digitaltwin\building_service\dto\BuildingHierarchyDto.class
 com\digitaltwin\building_service\service\WaveonFusionService$MappingRoom.class
 com\digitaltwin\building_service\service\IfcParserService$IfcElement.class
 com\digitaltwin\building_service\config\KafkaConfig.class
-com\digitaltwin\building_service\repository\SensorMeasurementRepository.class
 com\digitaltwin\building_service\domain\Equipment.class
 com\digitaltwin\building_service\domain\SensorMeasurement.class
 com\digitaltwin\building_service\dto\ReservationRoomDto.class
@@ -20,9 +19,7 @@ com\digitaltwin\building_service\service\IfcEnrichmentService$MappingRoom.class
 com\digitaltwin\building_service\dto\IfcFileStatusDto.class
 com\digitaltwin\building_service\config\WebSocketConfig.class
 com\digitaltwin\building_service\service\WaveonFusionService$MetricInfo.class
-com\digitaltwin\building_service\controller\BuildingController.class
 com\digitaltwin\building_service\init\DataInitializer.class
-com\digitaltwin\building_service\kafka\SensorDataConsumer.class
 com\digitaltwin\building_service\kafka\SensorReadingEvent.class
 com\digitaltwin\building_service\dto\EquipmentDto.class
 com\digitaltwin\building_service\dto\ZoneDto.class

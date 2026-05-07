@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Zap, TrendingDown, TrendingUp, Battery, Sun, Sparkles, Lightbulb, RefreshCw, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
 import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { getAllRecentMeasurements, getAllRealtimeData, getEnergyComparison, type SensorMeasurement, type EnergyComparisonDto } from '../../services/api';
+import { getAllRecentMeasurements, getAllRealtimeData, getEnergyComparison, getEnergyConsumptionByRoom, type SensorMeasurement, type EnergyComparisonDto, type RoomEnergyConsumptionDto } from '../../services/api';
 
 const sourceData = [
   { name: 'Grid', value: 70, color: '#3b82f6' },
@@ -10,12 +10,13 @@ const sourceData = [
 ];
 
 export function EnergyView() {
-  const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [energyComparison, setEnergyComparison] = useState<EnergyComparisonDto | null>(null);
-  const [isRealtime, setIsRealtime] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+   const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [energyComparison, setEnergyComparison] = useState<EnergyComparisonDto | null>(null);
+   const [roomConsumptions, setRoomConsumptions] = useState<RoomEnergyConsumptionDto[]>([]);
+   const [isRealtime, setIsRealtime] = useState(false);
+   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const stompClient = useRef<any>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -80,18 +81,21 @@ export function EnergyView() {
     });
   };
 
-  const startPolling = () => {
-    if (pollingRef.current) return;
-    pollingRef.current = window.setInterval(() => {
-      getAllRealtimeData()
-        .then(updateMeasurements)
-        .catch(console.error);
-      getEnergyComparison()
-        .then(setEnergyComparison)
-        .catch(console.error);
-    }, 2000);
-    setIsRealtime(false);
-  };
+   const startPolling = () => {
+     if (pollingRef.current) return;
+     pollingRef.current = window.setInterval(() => {
+       getAllRealtimeData()
+         .then(updateMeasurements)
+         .catch(console.error);
+       getEnergyComparison()
+         .then(setEnergyComparison)
+         .catch(console.error);
+       getEnergyConsumptionByRoom()
+         .then(setRoomConsumptions)
+         .catch(console.error);
+     }, 2000);
+     setIsRealtime(false);
+   };
 
   const stopRealtime = () => {
     if (stompClient.current) {
@@ -105,21 +109,23 @@ export function EnergyView() {
     setIsRealtime(false);
   };
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const measurementsData = await getAllRecentMeasurements();
-      const energyData = await getEnergyComparison();
-      setMeasurements(measurementsData);
-      setEnergyComparison(energyData);
-      setLastUpdate(new Date());
-    } catch (err) {
-      setError('Impossible de charger les données énergie (Spring Boot port 8084)');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+   const fetchData = async () => {
+     setIsLoading(true);
+     setError(null);
+     try {
+       const measurementsData = await getAllRecentMeasurements();
+       const energyData = await getEnergyComparison();
+       const roomData = await getEnergyConsumptionByRoom();
+       setMeasurements(measurementsData);
+       setEnergyComparison(energyData);
+       setRoomConsumptions(roomData);
+       setLastUpdate(new Date());
+     } catch (err) {
+       setError('Impossible de charger les données énergie (Spring Boot port 8084)');
+     } finally {
+       setIsLoading(false);
+     }
+   };
 
   const toggleRealtime = () => {
     if (isRealtime) {
@@ -139,22 +145,19 @@ export function EnergyView() {
   }, []);
 
   const energyMeasurements = measurements.filter(m => m.sensorType === 'energy');
-  const totalKwh = energyMeasurements.reduce((s, m) => s + m.value, 0);
-  const totalMwh = (totalKwh / 1000).toFixed(0);
+  const totalMwh = energyComparison ? (energyComparison.currentTotalKwh / 1000).toFixed(0) : '0';
   const uniqueRooms = [...new Set(energyMeasurements.map(m => m.roomName))];
 
-  const chartData = energyMeasurements
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .slice(-24)
-    .map(m => ({
-      hour: new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      consumption: Math.round(m.value / 1000),
-      room: m.roomName,
-    }));
+   const chartData = energyMeasurements
+     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+     .slice(-24)
+     .map(m => ({
+       hour: new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+       consumption: Math.round(m.value / 1000),
+       room: m.roomName,
+     }));
 
-  const top5 = [...energyMeasurements]
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
+   const top5 = roomConsumptions.slice(0, 5);
 
   return (
     <div className="soft-page min-h-full p-8 space-y-8 relative overflow-hidden">
@@ -235,7 +238,7 @@ export function EnergyView() {
             {
               label: 'Salles surveillées',
               value: isLoading ? '...' : `${uniqueRooms.length}`,
-              unit: 'zones',
+              unit: 'salles',
               icon: TrendingDown,
               change: 0,
               gradient: 'from-purple-400 via-pink-500 to-fuchsia-600',
@@ -244,8 +247,8 @@ export function EnergyView() {
             },
             {
               label: 'Pic max',
-              value: isLoading ? '...' : energyMeasurements.length > 0 ? `${(Math.max(...energyMeasurements.map(m => m.value)) / 1000).toFixed(0)}` : '0',
-              unit: 'kWh',
+              value: isLoading ? '...' : energyComparison ? `${(energyComparison.currentPeakValue / 1000).toFixed(1)}` : '0',
+              unit: 'MWh',
               icon: Battery,
               change: energyComparison?.peakPercentageChange ?? 3.2,
               gradient: 'from-green-400 via-emerald-500 to-teal-600',
@@ -356,11 +359,8 @@ export function EnergyView() {
                   <span className="text-zinc-500 text-xs">#{i + 1}</span>
                   <span className="text-white text-sm font-medium truncate">{m.roomName}</span>
                 </div>
-                <p className="text-2xl text-white font-bold">{(m.value / 1000).toFixed(0)}</p>
-                <p className="text-zinc-400 text-xs">kWh</p>
-                <div className={`mt-2 text-xs px-2 py-1 rounded-lg w-fit ${m.status === 'OK' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                  {m.status}
-                </div>
+                <p className="text-2xl text-white font-bold">{(m.totalKwh / 1000).toFixed(2)}</p>
+                <p className="text-zinc-400 text-xs">MWh</p>
               </div>
             ))}
             {top5.length === 0 && !isLoading && (

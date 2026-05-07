@@ -126,6 +126,11 @@ export type EnergyComparisonDto = {
   peakPercentageChange: number;
 };
 
+export type RoomEnergyConsumptionDto = {
+  roomName: string;
+  totalKwh: number;
+};
+
 export type EnergyRoomApiDto = {
   roomName: string;
   value: number;
@@ -205,6 +210,9 @@ export const getReservationRooms = (): Promise<ReservationRoomDto[]> =>
 
 export const getEnergyComparison = (): Promise<EnergyComparisonDto> =>
   get('/api/measurements/energy-comparison');
+
+export const getEnergyConsumptionByRoom = (): Promise<RoomEnergyConsumptionDto[]> =>
+  get('/api/measurements/energy-by-room');
 
 export const getEnergyRooms = async (): Promise<EnergyRoomApiDto[]> => {
   const res = await fetch(ENERGY_ROOMS_URL);

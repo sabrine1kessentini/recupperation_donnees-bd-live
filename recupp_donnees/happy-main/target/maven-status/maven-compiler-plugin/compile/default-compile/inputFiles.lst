@@ -9,15 +9,20 @@ C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\BuildingStructure.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\Equipment.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\Floor.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\RoomReservation.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\SensorMeasurement.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\Site.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\domain\Zone.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\BuildingHierarchyDto.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\EnergyComparisonDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\EquipmentDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\FloorDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\IfcEnrichmentResultDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\IfcFileStatusDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\RealtimeMeasurementDto.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\ReservationDto.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\ReservationRequestDto.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\ReservationRoomDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\RoomDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\SensorDataDto.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\dto\SensorDetailsDto.java
@@ -36,6 +41,7 @@ C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\BuildingStructureRepository.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\EquipmentRepository.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\FloorRepository.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\RoomReservationRepository.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\SensorMeasurementRepository.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\SiteRepository.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\repository\ZoneRepository.java
@@ -43,4 +49,5 @@ C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\service\IfcEnrichmentService.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\service\IfcParserService.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\service\IfcService.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\service\ReservationService.java
 C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\recupp_donnees\happy-main\src\main\java\com\digitaltwin\building_service\service\WaveonFusionService.java

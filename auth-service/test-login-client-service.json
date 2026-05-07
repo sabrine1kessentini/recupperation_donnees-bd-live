@@ -1,0 +1,40 @@
+{
+  "name": "LoginClientService Test",
+  "description": "Test the LoginClientService endpoint with the example credentials",
+  "method": "POST",
+  "url": "http://localhost:8080/auth/LoginClientService",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "email": "amal.waly@etudiant-isi.utm.tn",
+    "password": "123456",
+    "devicename": "a989b76f5d8c827c"
+  },
+  "expectedResponse": {
+    "status": 200,
+    "fields": [
+      "idclient",
+      "clientname",
+      "email",
+      "username",
+      "token",
+      "iduser",
+      "devicename",
+      "active",
+      "numberofphones",
+      "unicastadress",
+      "isadmin",
+      "databaseIP",
+      "databasePORT"
+    ]
+  },
+  "notes": [
+    "This endpoint authenticates users using email and password",
+    "Returns a complete user session object with JWT token",
+    "The token field contains a JWT that can be used for subsequent API calls",
+    "Test user is automatically created on application startup",
+    "Email: amal.waly@etudiant-isi.utm.tn",
+    "Password: 123456"
+  ]
+}

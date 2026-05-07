@@ -6,7 +6,9 @@ com\digitaltwin\building_service\config\KafkaConfig.class
 com\digitaltwin\building_service\repository\SensorMeasurementRepository.class
 com\digitaltwin\building_service\domain\Equipment.class
 com\digitaltwin\building_service\domain\SensorMeasurement.class
+com\digitaltwin\building_service\dto\ReservationRoomDto.class
 com\digitaltwin\building_service\dto\SiteHierarchyDto.class
+com\digitaltwin\building_service\dto\EnergyComparisonDto.class
 com\digitaltwin\building_service\repository\EquipmentRepository.class
 com\digitaltwin\building_service\domain\Site.class
 com\digitaltwin\building_service\dto\FloorDto.class
@@ -29,6 +31,7 @@ com\digitaltwin\building_service\config\WebMvcConfig.class
 com\digitaltwin\building_service\config\CorsConfig.class
 com\digitaltwin\building_service\dto\SensorHistoryDto.class
 com\digitaltwin\building_service\service\WaveonFusionService.class
+com\digitaltwin\building_service\dto\ReservationDto.class
 com\digitaltwin\building_service\dto\IfcEnrichmentResultDto.class
 com\digitaltwin\building_service\dto\SpaceSensorDto.class
 com\digitaltwin\building_service\domain\Floor.class
@@ -37,9 +40,14 @@ com\digitaltwin\building_service\config\JacksonConfig.class
 com\digitaltwin\building_service\service\WaveonFusionService$SmartController.class
 com\digitaltwin\building_service\kafka\SensorPollingScheduler.class
 com\digitaltwin\building_service\kafka\SensorDataProducer.class
+com\digitaltwin\building_service\service\ReservationService$DbRoomInfo.class
+com\digitaltwin\building_service\repository\RoomReservationRepository.class
+com\digitaltwin\building_service\dto\ReservationRequestDto.class
 com\digitaltwin\building_service\dto\TelemetryPointDto.class
 com\digitaltwin\building_service\service\IfcEnrichmentService$WaveonMapping.class
 com\digitaltwin\building_service\domain\Zone.class
+com\digitaltwin\building_service\service\ReservationService.class
+com\digitaltwin\building_service\domain\RoomReservation.class
 com\digitaltwin\building_service\service\HierarchyService.class
 com\digitaltwin\building_service\BuildingServiceApplication.class
 com\digitaltwin\building_service\service\WaveonFusionService$SensorView.class
@@ -56,5 +64,6 @@ com\digitaltwin\building_service\service\IfcEnrichmentService$SensorDescriptor.c
 com\digitaltwin\building_service\service\IfcEnrichmentService.class
 com\digitaltwin\building_service\dto\SensorSummaryDto.class
 com\digitaltwin\building_service\service\IfcParserService$IfcHierarchy.class
+com\digitaltwin\building_service\service\ReservationService$ReservationRoomSource.class
 com\digitaltwin\building_service\repository\ZoneRepository.class
 com\digitaltwin\building_service\dto\RoomDto.class

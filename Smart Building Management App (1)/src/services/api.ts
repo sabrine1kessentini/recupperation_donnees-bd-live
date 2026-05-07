@@ -1,7 +1,7 @@
 // src/services/api.ts
 // URL du backend Spring Boot
 const SPRING_URL = import.meta.env.VITE_SPRING_URL || 'http://localhost:8084';
-
+const ENERGY_ROOMS_URL = 'http://localhost:8080/api/energy/rooms';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SensorMeasurement = {
@@ -86,11 +86,81 @@ export type SpaceSensorDto = {
   sensors: SensorSummaryDto[];
 };
 
+export type ReservationDto = {
+  id: number;
+  ifcGlobalId: string;
+  roomName: string;
+  roomLongName: string | null;
+  storey: string | null;
+  location: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reservedSlot: string;
+  reservedBy: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+export type ReservationRoomDto = {
+  ifcGlobalId: string;
+  name: string;
+  longName: string | null;
+  storey: string | null;
+  location: string | null;
+  areaM2: number | null;
+  status: 'available' | 'reserved';
+  reservedSlot: string | null;
+  currentReservation: ReservationDto | null;
+  reservations: ReservationDto[];
+};
+
+export type EnergyComparisonDto = {
+  currentTotalKwh: number;
+  previousTotalKwh: number;
+  percentageChange: number;
+  currentTotalRaw: number;
+  previousTotalRaw: number;
+  currentPeakValue: number;
+  previousPeakValue: number;
+  peakPercentageChange: number;
+};
+
+export type EnergyRoomApiDto = {
+  roomName: string;
+  value: number;
+};
+
+export type ReservationRequest = {
+  ifcGlobalId: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  phone: string;
+  email: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${SPRING_URL}${path}`);
   if (!res.ok) throw new Error(`API error ${res.status} on ${path}`);
+  return res.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${SPRING_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const details = await res.json().catch(() => null);
+    throw new Error(details?.message || `API error ${res.status} on ${path}`);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -129,3 +199,18 @@ export const getSensorsByZone = (zoneId: number): Promise<SensorMeasurement[]> =
 /** Espaces/salles issus du mapping WaveOn + IFC */
 export const getSpaces = (): Promise<SpaceSensorDto[]> =>
   get('/api/spaces');
+
+export const getReservationRooms = (): Promise<ReservationRoomDto[]> =>
+  get('/api/reservations/rooms');
+
+export const getEnergyComparison = (): Promise<EnergyComparisonDto> =>
+  get('/api/measurements/energy-comparison');
+
+export const getEnergyRooms = async (): Promise<EnergyRoomApiDto[]> => {
+  const res = await fetch(ENERGY_ROOMS_URL);
+  if (!res.ok) throw new Error(`API error ${res.status} on ${ENERGY_ROOMS_URL}`);
+  return res.json() as Promise<EnergyRoomApiDto[]>;
+};
+
+export const createReservation = (request: ReservationRequest): Promise<ReservationDto> =>
+  post('/api/reservations', request);

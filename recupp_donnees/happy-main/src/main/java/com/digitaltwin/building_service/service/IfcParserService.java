@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -20,19 +22,32 @@ public class IfcParserService {
      * IFC entity data holder for extracted elements
      */
     public static class IfcElement {
+        private final String entityRef;
         private final String globalId;
         private final String name;
+        private final String longName;
         private final String ifcType;
+        private String storey;
 
         public IfcElement(String globalId, String name, String ifcType) {
+            this(null, globalId, name, null, ifcType);
+        }
+
+        public IfcElement(String entityRef, String globalId, String name, String longName, String ifcType) {
+            this.entityRef = entityRef;
             this.globalId = globalId;
             this.name = name;
+            this.longName = longName;
             this.ifcType = ifcType;
         }
 
+        public String getEntityRef() { return entityRef; }
         public String getGlobalId() { return globalId; }
         public String getName() { return name; }
+        public String getLongName() { return longName; }
         public String getIfcType() { return ifcType; }
+        public String getStorey() { return storey; }
+        public void setStorey(String storey) { this.storey = storey; }
     }
 
     /**
@@ -72,6 +87,9 @@ public class IfcParserService {
      */
     public IfcHierarchy extractHierarchy() {
         IfcHierarchy hierarchy = new IfcHierarchy();
+        Map<String, IfcElement> floorsByRef = new LinkedHashMap<>();
+        Map<String, IfcElement> spacesByRef = new LinkedHashMap<>();
+        Map<String, String> spaceToStoreyRef = new LinkedHashMap<>();
         Path path = getResolvedPath();
 
         System.out.println("IFC Parser: Reading file from: " + path.toAbsolutePath());
@@ -93,6 +111,7 @@ public class IfcParserService {
                     IfcElement floor = parseIfcElement(line, "IFCBUILDINGSTOREY");
                     if (floor != null) {
                         hierarchy.addFloor(floor);
+                        floorsByRef.put(floor.getEntityRef(), floor);
                     }
                 }
                 // Extract IFCSPACE (Rooms)
@@ -100,7 +119,11 @@ public class IfcParserService {
                     IfcElement space = parseIfcElement(line, "IFCSPACE");
                     if (space != null) {
                         hierarchy.addSpace(space);
+                        spacesByRef.put(space.getEntityRef(), space);
                     }
+                }
+                else if (line.contains("IFCRELCONTAINEDINSPATIALSTRUCTURE")) {
+                    collectSpatialRelation(line, spaceToStoreyRef);
                 }
                 // Extract IFCDEVICE (Equipment)
                 else if (line.contains("IFCDEVICE")) {
@@ -110,6 +133,8 @@ public class IfcParserService {
                     }
                 }
             }
+
+            applyStoreys(spacesByRef, floorsByRef, spaceToStoreyRef);
 
             System.out.println("IFC Parser: Found " + hierarchy.getBuildings().size() + " buildings");
             System.out.println("IFC Parser: Found " + hierarchy.getFloors().size() + " floors");
@@ -162,12 +187,126 @@ public class IfcParserService {
      */
     private IfcElement parseIfcElement(String line, String ifcType) {
         try {
-            String globalId = extractGlobalId(line);
-            String name = extractName(line);
-            return new IfcElement(globalId, name, ifcType);
+            String entityRef = extractEntityRef(line);
+            List<String> args = extractArguments(line, ifcType);
+            String globalId = args.size() > 0 ? stripIfcValue(args.get(0)) : extractGlobalId(line);
+            String name = args.size() > 2 ? stripIfcValue(args.get(2)) : extractName(line);
+            String longName = args.size() > 7 ? stripIfcValue(args.get(7)) : null;
+            return new IfcElement(entityRef, globalId, cleanName(name), cleanName(longName), ifcType);
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private void collectSpatialRelation(String line, Map<String, String> spaceToStoreyRef) {
+        try {
+            List<String> args = extractArguments(line, "IFCRELCONTAINEDINSPATIALSTRUCTURE");
+            if (args.size() < 6) {
+                return;
+            }
+
+            String relatedElements = args.get(4).trim();
+            String relatingStructure = args.get(5).trim();
+            for (String ref : extractRefs(relatedElements)) {
+                spaceToStoreyRef.put(ref, relatingStructure);
+            }
+        } catch (Exception ignored) {
+            // Keep the parser permissive: missing storey data should not hide rooms.
+        }
+    }
+
+    private void applyStoreys(Map<String, IfcElement> spacesByRef,
+                              Map<String, IfcElement> floorsByRef,
+                              Map<String, String> spaceToStoreyRef) {
+        for (Map.Entry<String, String> entry : spaceToStoreyRef.entrySet()) {
+            IfcElement space = spacesByRef.get(entry.getKey());
+            IfcElement floor = floorsByRef.get(entry.getValue());
+            if (space != null && floor != null) {
+                space.setStorey(floor.getLongName() != null ? floor.getLongName() : floor.getName());
+            }
+        }
+    }
+
+    private String extractEntityRef(String line) {
+        int start = line.indexOf("#");
+        int end = line.indexOf("=");
+        if (start == -1 || end == -1 || end <= start) {
+            return null;
+        }
+        return line.substring(start, end).trim();
+    }
+
+    private List<String> extractArguments(String line, String ifcType) {
+        int typeIndex = line.indexOf(ifcType);
+        if (typeIndex == -1) {
+            return List.of();
+        }
+        int start = line.indexOf("(", typeIndex);
+        int end = line.lastIndexOf(")");
+        if (start == -1 || end == -1 || end <= start) {
+            return List.of();
+        }
+        return splitIfcArguments(line.substring(start + 1, end));
+    }
+
+    private List<String> splitIfcArguments(String raw) {
+        List<String> args = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        boolean inString = false;
+
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '\'') {
+                current.append(c);
+                if (inString && i + 1 < raw.length() && raw.charAt(i + 1) == '\'') {
+                    current.append(raw.charAt(i + 1));
+                    i++;
+                } else {
+                    inString = !inString;
+                }
+                continue;
+            }
+            if (!inString) {
+                if (c == '(') depth++;
+                if (c == ')') depth--;
+                if (c == ',' && depth == 0) {
+                    args.add(current.toString().trim());
+                    current.setLength(0);
+                    continue;
+                }
+            }
+            current.append(c);
+        }
+
+        args.add(current.toString().trim());
+        return args;
+    }
+
+    private List<String> extractRefs(String raw) {
+        List<String> refs = new ArrayList<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("#\\d+").matcher(raw);
+        while (matcher.find()) {
+            refs.add(matcher.group());
+        }
+        return refs;
+    }
+
+    private String stripIfcValue(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        if ("$".equals(trimmed) || "*".equals(trimmed)) return null;
+        if (trimmed.length() >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'")) {
+            return trimmed.substring(1, trimmed.length() - 1).replace("''", "'");
+        }
+        return trimmed;
+    }
+
+    private String cleanName(String value) {
+        if (value == null || value.trim().isEmpty() || "$".equals(value.trim())) {
+            return null;
+        }
+        return value.trim();
     }
 
     /**

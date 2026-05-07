@@ -1,29 +1,38 @@
-import { useMemo, useState } from 'react';
-import { CalendarClock, CheckCircle2, CircleAlert, Clock3, Users, Wrench } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Users } from 'lucide-react';
+import { createReservation, getReservationRooms, type ReservationRoomDto } from '../../services/api';
 
-type RoomStatus = 'available' | 'reserved' | 'maintenance';
+type RoomStatus = 'available' | 'reserved';
 
 type MeetingRoom = {
-  id: number;
+  id: string;
   name: string;
+  displayName: string;
+  code: string;
   floor: string;
-  capacity: number;
+  location: string;
+  capacity: string;
   status: RoomStatus;
-  reservedSlot?: string;
+  reservedSlot?: string | null;
+  reservations: ReservationRoomDto['reservations'];
 };
 
-const initialRooms: MeetingRoom[] = [
-  { id: 1, name: 'Salle 1', floor: 'Etage 1', capacity: 10, status: 'available' },
-  { id: 2, name: 'Salle 4', floor: 'Etage 2', capacity: 12, status: 'reserved', reservedSlot: '10:00 - 11:30' },
-  { id: 3, name: 'Salle 6', floor: 'Etage 3', capacity: 8, status: 'maintenance' },
-  { id: 4, name: 'Salle 2', floor: 'Etage 1', capacity: 6, status: 'available' },
-  { id: 5, name: 'Salle 5', floor: 'Etage 2', capacity: 14, status: 'reserved', reservedSlot: '14:00 - 15:00' },
-  { id: 6, name: 'Salle 7', floor: 'Etage 4', capacity: 8, status: 'available' },
-];
+const toRoom = (room: ReservationRoomDto): MeetingRoom => ({
+  id: room.ifcGlobalId,
+  name: room.name,
+  displayName: room.longName || room.name,
+  code: room.name,
+  floor: room.storey || 'Etage non renseigne',
+  location: room.location || 'IFC',
+  capacity: room.areaM2 ? `${room.areaM2.toFixed(1)} m2` : 'Surface non renseignee',
+  status: room.status,
+  reservedSlot: room.reservedSlot,
+  reservations: room.reservations,
+});
 
 export function ReservationView() {
-  const [rooms, setRooms] = useState<MeetingRoom[]>(initialRooms);
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [rooms, setRooms] = useState<MeetingRoom[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -32,6 +41,8 @@ export function ReservationView() {
   const [country, setCountry] = useState('Tunisie'); // valeur par défaut
   const [phone, setPhone] = useState('+216');
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const countryPrefixes: Record<string, string> = {
   Tunisie: '+216',
   France: '+33',
@@ -40,6 +51,23 @@ export function ReservationView() {
   USA: '+1',
 };
   const [message, setMessage] = useState<string | null>(null);
+
+  const loadRooms = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getReservationRooms();
+      setRooms(data.map(toRoom));
+      setMessage(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Impossible de charger les salles IFC.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRooms();
+  }, []);
 
   const selectedRoom = useMemo(
     () => rooms.find((room) => room.id === selectedRoomId) ?? null,
@@ -61,14 +89,9 @@ export function ReservationView() {
         icon: <Clock3 className="h-4 w-4" />,
       };
     }
-    return {
-      label: 'En panne',
-      classes: 'bg-red-500/15 text-red-400 border-red-500/30',
-      icon: <Wrench className="h-4 w-4" />,
-    };
   };
 
-  const handleReserve = () => {
+  const handleReserve = async () => {
     if (!selectedRoom) {
       setMessage('Selectionnez une salle disponible.');
       return;
@@ -86,15 +109,26 @@ export function ReservationView() {
       return;
     }
 
-    const slot = `${startTime} - ${endTime}`;
-    setRooms((prev) =>
-      prev.map((room) =>
-        room.id === selectedRoom.id
-          ? { ...room, status: 'reserved', reservedSlot: slot }
-          : room
-      )
-    );
-    setMessage(`Reservation confirmee pour ${selectedRoom.name} le ${date}.`);
+    setIsSaving(true);
+    try {
+      await createReservation({
+        ifcGlobalId: selectedRoom.id,
+        firstName,
+        lastName,
+        country,
+        phone,
+        email,
+        date,
+        startTime,
+        endTime,
+      });
+      await loadRooms();
+      setMessage(`Reservation confirmee pour ${selectedRoom.displayName} le ${date} de ${startTime} a ${endTime}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Reservation impossible.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -106,6 +140,18 @@ export function ReservationView() {
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-4">
+          {isLoading && (
+            <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-5 text-sm text-zinc-300">
+              Chargement des salles IFC...
+            </div>
+          )}
+
+          {!isLoading && rooms.length === 0 && (
+            <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-5 text-sm text-zinc-300">
+              Aucune salle IFC trouvee.
+            </div>
+          )}
+
           {rooms.map((room) => {
             const statusUi = getStatusUi(room.status);
             const isActive = selectedRoomId === room.id;
@@ -122,8 +168,9 @@ export function ReservationView() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-white text-lg font-semibold">{room.name}</h3>
-                    <p className="text-zinc-400 text-sm mt-1">{room.floor}</p>
+                    <h3 className="text-white text-lg font-semibold">{room.displayName}</h3>
+                    <p className="text-zinc-400 text-sm mt-1">{room.code} - {room.floor}</p>
+                    <p className="text-zinc-500 text-xs mt-1">{room.location}</p>
                   </div>
 
                   <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusUi.classes}`}>
@@ -135,7 +182,11 @@ export function ReservationView() {
                 <div className="mt-4 flex items-center gap-5 text-sm">
                   <span className="inline-flex items-center gap-2 text-zinc-300">
                     <Users className="h-4 w-4 text-zinc-400" />
-                    {room.capacity} occupation
+                    {room.capacity}
+                  </span>
+                  <span className="inline-flex items-center gap-2 text-zinc-300">
+                    <MapPin className="h-4 w-4 text-zinc-400" />
+                    {room.floor}
                   </span>
                   {room.reservedSlot && (
                     <span className="inline-flex items-center gap-2 text-zinc-300">
@@ -154,10 +205,24 @@ export function ReservationView() {
                         ? 'bg-[#f4b400] text-white hover:bg-[#e1a600]'
                         : 'bg-zinc-700/60 text-zinc-400 cursor-not-allowed'
                     }`}
-                  >
+                    >
                     Reserver
                   </button>
                 </div>
+
+                {room.reservations.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-zinc-800/60 bg-zinc-950/30 p-3">
+                    <p className="text-xs font-medium text-zinc-400">Reservations</p>
+                    <div className="mt-2 space-y-1">
+                      {room.reservations.slice(0, 3).map((reservation) => (
+                        <p key={reservation.id} className="text-xs text-zinc-300">
+                          {reservation.reservedSlot}
+                          {reservation.reservedBy ? ` - ${reservation.reservedBy}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -173,7 +238,7 @@ export function ReservationView() {
             <div>
               <label className="text-xs text-zinc-400">Salle choisie</label>
               <div className="mt-1 rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200">
-                {selectedRoom?.name ?? 'Aucune salle selectionnee'}
+                {selectedRoom ? `${selectedRoom.displayName} (${selectedRoom.code})` : 'Aucune salle selectionnee'}
               </div>
             </div>
 
@@ -272,9 +337,10 @@ export function ReservationView() {
 
             <button
               onClick={handleReserve}
-              className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600]"
+              disabled={isSaving}
+              className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-zinc-700/60 disabled:text-zinc-400"
             >
-              Confirmer reservation
+              {isSaving ? 'Reservation...' : 'Confirmer reservation'}
             </button>
 
             {message && (

@@ -174,6 +174,58 @@ public class BuildingController {
         return ResponseEntity.ok(sensorMeasurementRepository.findTop500ByOrderByRecordedAtDesc());
     }
 
+    @GetMapping("/measurements/energy-comparison")
+    public ResponseEntity<EnergyComparisonDto> getEnergyComparison() {
+        Instant now = Instant.now();
+        Instant weekStart = now.minus(7, java.time.temporal.ChronoUnit.DAYS);
+        Instant twoWeeksAgo = now.minus(14, java.time.temporal.ChronoUnit.DAYS);
+
+        Double currentTotal = sensorMeasurementRepository.sumValueBySensorTypeAndMeasuredAtBetween(
+                "energy", weekStart, now);
+        Double previousTotal = sensorMeasurementRepository.sumValueBySensorTypeAndMeasuredAtBetween(
+                "energy", twoWeeksAgo, weekStart);
+
+        currentTotal = currentTotal != null ? currentTotal : 0.0;
+        previousTotal = previousTotal != null ? previousTotal : 0.0;
+
+        double percentageChange = 0.0;
+        if (previousTotal > 0) {
+            percentageChange = ((currentTotal - previousTotal) / previousTotal) * 100.0;
+        } else if (currentTotal > 0) {
+            percentageChange = 100.0;
+        }
+
+        percentageChange = Math.round(percentageChange * 10.0) / 10.0;
+
+        Double currentPeak = sensorMeasurementRepository.findMaxValueBySensorTypeAndMeasuredAtBetween(
+                "energy", weekStart, now);
+        Double previousPeak = sensorMeasurementRepository.findMaxValueBySensorTypeAndMeasuredAtBetween(
+                "energy", twoWeeksAgo, weekStart);
+
+        currentPeak = currentPeak != null ? currentPeak : 0.0;
+        previousPeak = previousPeak != null ? previousPeak : 0.0;
+
+        double peakPercentageChange = 0.0;
+        if (previousPeak > 0) {
+            peakPercentageChange = ((currentPeak - previousPeak) / previousPeak) * 100.0;
+        } else if (currentPeak > 0) {
+            peakPercentageChange = 100.0;
+        }
+        peakPercentageChange = Math.round(peakPercentageChange * 10.0) / 10.0;
+
+        EnergyComparisonDto dto = new EnergyComparisonDto(
+                currentTotal / 1000.0,
+                previousTotal / 1000.0,
+                percentageChange,
+                currentTotal.longValue(),
+                previousTotal.longValue(),
+                currentPeak / 1000.0,
+                previousPeak / 1000.0,
+                peakPercentageChange
+        );
+        return ResponseEntity.ok(dto);
+    }
+
     /**
      * Déclenche manuellement la récupération des données WaveOn et leur envoi dans Kafka.
      * Les données seront ensuite consommées par SensorDataConsumer et persistées en BDD.

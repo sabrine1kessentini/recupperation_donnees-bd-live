@@ -57,9 +57,20 @@ export function ReservationView() {
     try {
       const data = await getReservationRooms();
       setRooms(data.map(toRoom));
-      setMessage(null);
+      if (data.length === 0) {
+        setMessage('Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne et que la base de donnees "buildingdb" contient les zones.');
+      } else {
+        setMessage(null);
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Impossible de charger les salles IFC.');
+      const msg = error instanceof Error ? error.message : 'Impossible de charger les salles IFC.';
+      if (msg.includes('500')) {
+        setMessage('Erreur serveur (500). Verifiez les logs du building-service - fichier IFC introuvable ou base de donnees non initialisee.');
+      } else if (msg.includes('404') || msg.includes('Failed to fetch')) {
+        setMessage('Building-service inaccessible. Verifiez que le backend est demarre sur le port 8084.');
+      } else {
+        setMessage(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +100,12 @@ export function ReservationView() {
         icon: <Clock3 className="h-4 w-4" />,
       };
     }
+    // Default fallback
+    return {
+      label: 'Inconnu',
+      classes: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+      icon: <CircleAlert className="h-4 w-4" />,
+    };
   };
 
   const handleReserve = async () => {

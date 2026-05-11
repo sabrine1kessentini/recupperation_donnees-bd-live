@@ -31,59 +31,59 @@ export function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps) {
   const [dataError, setDataError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  // Fetch météo (Node.js backend)
-  useEffect(() => {
-    let isMounted = true;
-    let controller: AbortController | null = null;
+// Fetch météo (Node.js backend)
+   useEffect(() => {
+     let isMounted = true;
+     let controller: AbortController | null = null;
 
-    const fetchWeather = async () => {
-      try {
-        setIsWeatherLoading(true);
-        setWeatherError(null);
-        controller?.abort();
-        controller = new AbortController();
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-        const response = await fetch(`${API_URL}/api/weather`, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Weather API returned ${response.status}`);
-        const payload: WeatherData = await response.json();
-        if (isMounted) setWeather(payload);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        if (isMounted) setWeatherError('Meteo indisponible');
-      } finally {
-        if (isMounted) setIsWeatherLoading(false);
-      }
-    };
+     const fetchWeather = async () => {
+       try {
+         setIsWeatherLoading(true);
+         setWeatherError(null);
+         controller?.abort();
+         controller = new AbortController();
+         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+         const response = await fetch(`${API_URL}/api/weather`, { signal: controller.signal });
+         if (!response.ok) throw new Error(`Weather API returned ${response.status}`);
+         const payload: WeatherData = await response.json();
+         if (isMounted) setWeather(payload);
+       } catch (error) {
+         if (error instanceof DOMException && error.name === 'AbortError') return;
+         if (isMounted) setWeatherError('Meteo indisponible');
+       } finally {
+         if (isMounted) setIsWeatherLoading(false);
+       }
+     };
 
-    fetchWeather();
-    const intervalId = window.setInterval(fetchSensorData, 5000);
-    return () => { isMounted = false; window.clearInterval(intervalId); controller?.abort(); };
-  }, []);
+     fetchWeather();
+     const intervalId = window.setInterval(fetchWeather, 5 * 60 * 1000);
+     return () => { isMounted = false; window.clearInterval(intervalId); controller?.abort(); };
+   }, []);
 
-  // Fetch données capteurs Spring Boot
-  const fetchSensorData = async () => {
-    setIsDataLoading(true);
-    setDataError(null);
-    try {
-      const [sessionData, measureData] = await Promise.all([
-        getWaveonSession(),
-        getAllRecentMeasurements(),
-      ]);
-      setSession(sessionData);
-      setMeasurements(measureData);
-      setLastRefresh(new Date());
-    } catch (err) {
-      setDataError('Impossible de contacter le serveur Spring Boot (port 8084)');
-    } finally {
-      setIsDataLoading(false);
-    }
-  };
+// Fetch données capteurs Spring Boot
+   const fetchSensorData = async () => {
+     setIsDataLoading(true);
+     setDataError(null);
+     try {
+       const [sessionData, measureData] = await Promise.all([
+         getWaveonSession(),
+         getAllRecentMeasurements(),
+       ]);
+       setSession(sessionData);
+       setMeasurements(measureData);
+       setLastRefresh(new Date());
+     } catch (err) {
+       setDataError('Impossible de contacter le serveur Spring Boot (port 8084)');
+     } finally {
+       setIsDataLoading(false);
+     }
+   };
 
-  useEffect(() => {
-    fetchSensorData();
-    const id = window.setInterval(fetchSensorData, 5 * 60 * 1000); // refresh every 5 min
-    return () => window.clearInterval(id);
-  }, []);
+   useEffect(() => {
+     fetchSensorData();
+     const id = window.setInterval(fetchSensorData, 5000);
+     return () => window.clearInterval(id);
+   }, []);
 
   // Stats calculées depuis les vraies mesures
   const tempMeasurements = measurements.filter(m => m.sensorType === 'temperature');

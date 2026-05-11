@@ -1,0 +1,14 @@
+com\digitaltwin\alert_service\model\Alert$AlertBuilder.class
+com\digitaltwin\alert_service\kafka\SensorReadingEvent.class
+com\digitaltwin\alert_service\model\AlertRule.class
+com\digitaltwin\alert_service\repository\AlertRuleRepository.class
+com\digitaltwin\alert_service\controller\AlertController.class
+com\digitaltwin\alert_service\repository\AlertRepository.class
+com\digitaltwin\alert_service\engine\AlertEngine.class
+com\digitaltwin\alert_service\model\Severity.class
+com\digitaltwin\alert_service\config\KafkaConfig.class
+com\digitaltwin\alert_service\model\Alert.class
+com\digitaltwin\alert_service\model\AlertStatus.class
+com\digitaltwin\alert_service\AlertServiceApplication.class
+com\digitaltwin\alert_service\service\AlertService.class
+com\digitaltwin\alert_service\kafka\AlertConsumer.class

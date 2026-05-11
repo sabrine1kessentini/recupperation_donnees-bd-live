@@ -13,7 +13,7 @@ export interface SensorReading {
   value: number;
   unit: string;
   status: string;
-  measuredAt: string;
+  timestamp: string;
 }
 
 export function useRealtimeData(maxHistory = 100) {

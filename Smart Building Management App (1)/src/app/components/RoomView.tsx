@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
-  ArrowLeft,
+  AlertTriangle, ArrowLeft,
   DoorOpen,
   Droplets,
   Gauge,
@@ -22,11 +21,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useRealtimeData } from '../../hooks/useRealtimeData';
 import {
-  getSensorHistory,
+  getAllRecentMeasurements,
   getSpaces,
-  type SensorHistorySeries,
   type SensorMeasurement,
   type SpaceSensorDto,
 } from '../../services/api';
@@ -43,53 +40,35 @@ type ChartPoint = {
 
 export function RoomView({ roomName, onBack }: RoomViewProps) {
   const [room, setRoom] = useState<SpaceSensorDto | null>(null);
+  const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // WebSocket realtime data hook
-  const { latest: realtimeData, connected } = useRealtimeData(100);
-
-  // Filter realtime measurements for this specific room
-  const measurements = useMemo(
-    () => realtimeData.filter((m) => m.roomName === roomName),
-    [realtimeData, roomName]
-  );
-
-  const [historyByType, setHistoryByType] = useState<Record<string, SensorHistorySeries>>({});
-
-  const loadRoomInfo = async () => {
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const spaces = await getSpaces();
-      const currentRoom = spaces.find((space) => space.ifcName === roomName) ?? null;
+      const [spaces, measurementsData] = await Promise.all([
+        getSpaces(),
+        getAllRecentMeasurements(),
+      ]);
+      const currentRoom = spaces.find((space: SpaceSensorDto) => space.ifcName === roomName) ?? null;
       setRoom(currentRoom);
+      setMeasurements(measurementsData);
+      setLastUpdate(new Date());
     } catch {
-      setError('Impossible de charger les donnees de la salle depuis Spring Boot (port 8084).');
+      setError('Impossible de charger les donnees depuis Spring Boot (port 8084).');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const loadHistory = async () => {
-    if (!room?.sensors.length) return;
-    const historyEntries = await Promise.all(
-      room.sensors.map(async (sensor) => {
-        const series = await getSensorHistory(sensor.id, 24, 24);
-        return series[0] ?? null;
-      }),
-    );
-    const next = historyEntries.reduce<Record<string, SensorHistorySeries>>((acc, series) => {
-      if (series) acc[series.sensorType] = series;
-      return acc;
-    }, {});
-    setHistoryByType(next);
-  };
-
   useEffect(() => {
-    loadRoomInfo();
+    fetchData();
+    const id = window.setInterval(fetchData, 5000);
+    return () => window.clearInterval(id);
   }, [roomName]);
-
-  useEffect(() => {
-    loadHistory();
-    const intervalId = window.setInterval(loadHistory, 30000);
-    return () => window.clearInterval(intervalId);
-  }, [room]);
 
   const measurementsByType = useMemo(() => {
     return measurements.reduce<Record<string, SensorMeasurement>>((acc, measurement) => {
@@ -98,38 +77,49 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
     }, {});
   }, [measurements]);
 
-  const sensorCount = room?.sensors.length ?? measurements.length;
+  const roomMeasurements = useMemo(
+    () => measurements.filter((m) => m.roomName === roomName),
+    [measurements, roomName]
+  );
+
+  const sensorCount = room?.sensors.length ?? 0;
   const temperature = measurementsByType.temperature?.value ?? null;
   const humidity = measurementsByType.humidity?.value ?? null;
   const energy = measurementsByType.energy?.value ?? null;
   const occupancy = measurementsByType.occupancy?.value ?? null;
-  const alertCount = measurements.filter((m) => m.status !== 'OK').length;
+  const alertCount = roomMeasurements.filter((m) => m.status !== 'OK').length;
 
-  const buildChartData = (series?: SensorHistorySeries): ChartPoint[] => {
-    if (!series) return [];
-    return series.points
-      .filter((point): point is { timestamp: string; value: number } => point.value !== null)
-      .map((point) => ({
-        time: new Date(point.timestamp).toLocaleTimeString('fr-FR', {
+  const temperatureHistory = useMemo(() => {
+    return measurements
+      .filter((m) => m.sensorType === 'temperature')
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .slice(-24)
+      .map((m) => ({
+        time: new Date(m.timestamp).toLocaleTimeString('fr-FR', {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        value: point.value,
+        value: m.value,
       }));
-  };
+  }, [measurements]);
 
-  const temperatureHistory = buildChartData(historyByType.temperature);
-  const humidityHistory = buildChartData(historyByType.humidity);
+  const humidityHistory = useMemo(() => {
+    return measurements
+      .filter((m) => m.sensorType === 'humidity')
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .slice(-24)
+      .map((m) => ({
+        time: new Date(m.timestamp).toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        value: m.value,
+      }));
+  }, [measurements]);
 
   return (
     <div className="min-h-full p-6 bg-[radial-gradient(circle_at_top_left,#f7f4ed_0,#ece5d6_38%,#e7ebef_100%)]">
       <div className="mx-auto max-w-7xl space-y-6">
-        {connected && (
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm text-green-600">Temps reel actif via WebSocket</span>
-          </div>
-        )}
         <header className="rounded-[32px] border border-white/80 bg-white/70 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-4">
@@ -156,12 +146,18 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
                 <p className="mt-1 font-medium">{room?.ifcLongName || 'Conference Room 3'}</p>
               </div>
               <button
-                onClick={loadRoomInfo}
-                className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm text-white transition hover:bg-zinc-800"
+                onClick={fetchData}
+                disabled={isLoading}
+                className="inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm text-white transition hover:bg-zinc-800 disabled:opacity-50"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Rafraichir
               </button>
+              {lastUpdate && (
+                <p className="text-xs text-zinc-500">
+                  Derniere MAJ: {lastUpdate.toLocaleTimeString('fr-FR')}
+                </p>
+              )}
             </div>
           </div>
         </header>
@@ -260,7 +256,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
             <div className="mt-6 rounded-2xl border border-zinc-200 bg-white/70 p-4">
               <div className="grid gap-3 md:grid-cols-2">
                 {(room?.sensors ?? []).map((sensor) => {
-                  const measurement = measurements.find((item) => item.sensorId === sensor.id);
+                  const measurement = roomMeasurements.find((item) => item.sensorId === sensor.id);
                   return (
                     <div key={sensor.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/80 p-4">
                       <div className="flex items-start justify-between gap-3">
@@ -324,7 +320,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
         <section className="grid gap-6 xl:grid-cols-2">
           <article className="rounded-[30px] bg-white/80 p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-zinc-800">Historique temperature</h2>
-            <p className="mt-1 text-sm text-zinc-500">24 derniers points du capteur temperature de {roomName}</p>
+            <p className="mt-1 text-sm text-zinc-500">24 derniers points du capteur temperature</p>
             <div className="mt-6 h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={temperatureHistory}>
@@ -340,7 +336,7 @@ export function RoomView({ roomName, onBack }: RoomViewProps) {
 
           <article className="rounded-[30px] bg-white/80 p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-zinc-800">Historique humidite</h2>
-            <p className="mt-1 text-sm text-zinc-500">24 derniers points du capteur humidite de {roomName}</p>
+            <p className="mt-1 text-sm text-zinc-500">24 derniers points du capteur humidite</p>
             <div className="mt-6 h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={humidityHistory}>

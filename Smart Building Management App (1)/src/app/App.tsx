@@ -12,6 +12,12 @@ import { AuthView } from './components/AuthView';
 import { ReservationView } from './components/ReservationView';
 import { RoomView } from './components/RoomView';
 
+type DashboardProps = {
+  onOpenRoom?: (roomName: string) => void;
+};
+
+type DashboardViewProps = DashboardProps;
+
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);

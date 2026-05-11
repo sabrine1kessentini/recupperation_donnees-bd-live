@@ -1,0 +1,13 @@
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\config\KafkaConfig.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\model\Severity.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\repository\AlertRepository.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\service\AlertService.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\controller\AlertController.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\repository\AlertRuleRepository.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\model\AlertStatus.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\model\Alert.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\AlertServiceApplication.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\engine\AlertEngine.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\kafka\SensorReadingEvent.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\model\AlertRule.java
+C:\Users\CYBORG\Desktop\stagepfe\dashboardtest\pfe\alert-service\src\main\java\com\digitaltwin\alert_service\kafka\AlertConsumer.java

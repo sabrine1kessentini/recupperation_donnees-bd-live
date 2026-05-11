@@ -1,13 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Zap, TrendingDown, TrendingUp, Battery, Sun, Sparkles, Lightbulb, RefreshCw, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
-import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { getAllRecentMeasurements, getAllRealtimeData, getEnergyComparison, getEnergyConsumptionByRoom, type SensorMeasurement, type EnergyComparisonDto, type RoomEnergyConsumptionDto } from '../../services/api';
-
-const sourceData = [
-  { name: 'Grid', value: 70, color: '#3b82f6' },
-  { name: 'Solar', value: 20, color: '#f59e0b' },
-  { name: 'Battery', value: 10, color: '#10b981' },
-];
+import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getAllRecentMeasurements, getAllRealtimeData, getEnergyComparison, getEnergyConsumptionByRoom, getActiveRoomsCount, getActiveSensorsCount, getConsumptionByUsage, type SensorMeasurement, type EnergyComparisonDto, type RoomEnergyConsumptionDto, type ConsumptionByUsageDto } from '../../services/api';
 
 export function EnergyView() {
    const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
@@ -15,13 +9,19 @@ export function EnergyView() {
    const [error, setError] = useState<string | null>(null);
    const [energyComparison, setEnergyComparison] = useState<EnergyComparisonDto | null>(null);
    const [roomConsumptions, setRoomConsumptions] = useState<RoomEnergyConsumptionDto[]>([]);
-   const [isRealtime, setIsRealtime] = useState(false);
-   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const stompClient = useRef<any>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+    const [activeRoomsCount, setActiveRoomsCount] = useState<number>(0);
+    const [activeSensorsCount, setActiveSensorsCount] = useState<number>(0);
+    const [consumptionByUsage, setConsumptionByUsage] = useState<ConsumptionByUsageDto | null>(null);
+    const [displayMode, setDisplayMode] = useState<'kwh' | 'eur'>('kwh');
+    const [isRealtime, setIsRealtime] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+    const stompClient = useRef<any>(null);
+    const pollingRef = useRef<number | null>(null);
+
+    const PRICE_PER_KWH = 0.20; // €/kWh – à ajuster selon le tarif réel
 
   const SPRING_URL = import.meta.env.VITE_SPRING_URL || 'http://localhost:8084';
-  const WS_URL = SPRING_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+  const WS_URL = SPRING_URL; // SockJS expects HTTP URL, handles WebSocket upgrade internally
 
   const updateMeasurements = (newMeasurements: SensorMeasurement[]) => {
     setMeasurements(prev => {
@@ -37,65 +37,77 @@ export function EnergyView() {
     setLastUpdate(new Date());
   };
 
-  const startRealtimeUpdates = () => {
-    if (stompClient.current?.connected) return;
+   const startRealtimeUpdates = () => {
+     if (stompClient.current?.connected) return;
 
-    import('@stomp/stompjs').then(({ Client }) => {
-      stompClient.current = new Client({
-        webSocketFactory: () => {
-          const SockJS = require('sockjs-client');
-          return new SockJS(`${WS_URL}/ws`);
-        },
-        debug: (str: string) => {
-          console.log('STOMP:', str);
-        },
-        onConnect: () => {
-          setIsRealtime(true);
-          setError(null);
-          stompClient.current.subscribe('/topic/sensor-data', (message: any) => {
-            try {
-              const data = JSON.parse(message.body);
-              updateMeasurements([data]);
-              setLastUpdate(new Date());
-            } catch (e) {
-              console.error('Failed to parse STOMP message:', e);
-            }
-          });
-        },
-        onStompError: (frame: any) => {
-          console.error('STOMP error:', frame);
-          setError('Erreur de connexion au service temps réel');
-        },
-        onWebSocketError: (err: any) => {
-          console.error('WebSocket error:', err);
-          setError('Erreur de connexion temps réel');
-        },
-        reconnectDelay: 5000,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-      });
-      stompClient.current.activate();
-    }).catch((err) => {
-      console.error('Failed to load STOMP client:', err);
-      startPolling();
-    });
-  };
-
-   const startPolling = () => {
-     if (pollingRef.current) return;
-     pollingRef.current = window.setInterval(() => {
-       getAllRealtimeData()
-         .then(updateMeasurements)
-         .catch(console.error);
-       getEnergyComparison()
-         .then(setEnergyComparison)
-         .catch(console.error);
-       getEnergyConsumptionByRoom()
-         .then(setRoomConsumptions)
-         .catch(console.error);
-     }, 2000);
-     setIsRealtime(false);
+     import('@stomp/stompjs').then(({ Client }) => {
+       import('sockjs-client').then(({ default: SockJS }) => {
+         stompClient.current = new Client({
+           webSocketFactory: () => {
+             return new SockJS(`${WS_URL}/ws`);
+           },
+           debug: (str: string) => {
+             console.log('STOMP:', str);
+           },
+           onConnect: () => {
+             setIsRealtime(true);
+             setError(null);
+             stompClient.current.subscribe('/topic/sensor-data', (message: any) => {
+               try {
+                 const data = JSON.parse(message.body);
+                 updateMeasurements([data]);
+                 setLastUpdate(new Date());
+               } catch (e) {
+                 console.error('Failed to parse STOMP message:', e);
+               }
+             });
+           },
+           onStompError: (frame: any) => {
+             console.error('STOMP error:', frame);
+             setError('Erreur de connexion au service temps réel');
+           },
+           onWebSocketError: (err: any) => {
+             console.error('WebSocket error:', err);
+             setError('Erreur de connexion temps réel');
+           },
+           reconnectDelay: 5000,
+           heartbeatIncoming: 4000,
+           heartbeatOutgoing: 4000,
+         });
+         stompClient.current.activate();
+       }).catch((err) => {
+         console.error('Failed to load SockJS client:', err);
+       });
+     }).catch((err) => {
+       console.error('Failed to load STOMP client:', err);
+       startPolling();
+     });
    };
+
+    const startPolling = () => {
+      if (pollingRef.current) return;
+      pollingRef.current = window.setInterval(() => {
+        getAllRealtimeData()
+          .then(updateMeasurements)
+          .catch(console.error);
+        getEnergyComparison()
+          .then(setEnergyComparison)
+          .catch(console.error);
+        getEnergyConsumptionByRoom()
+          .then(setRoomConsumptions)
+          .catch(console.error);
+        getActiveRoomsCount()
+          .then(setActiveRoomsCount)
+          .catch(console.error);
+        getActiveSensorsCount()
+          .then(setActiveSensorsCount)
+          .catch(console.error);
+        getConsumptionByUsage()
+          .then(setConsumptionByUsage)
+          .catch(console.error);
+      }, 2000);
+      setIsRealtime(false);
+    };
 
   const stopRealtime = () => {
     if (stompClient.current) {
@@ -109,23 +121,29 @@ export function EnergyView() {
     setIsRealtime(false);
   };
 
-   const fetchData = async () => {
-     setIsLoading(true);
-     setError(null);
-     try {
-       const measurementsData = await getAllRecentMeasurements();
-       const energyData = await getEnergyComparison();
-       const roomData = await getEnergyConsumptionByRoom();
-       setMeasurements(measurementsData);
-       setEnergyComparison(energyData);
-       setRoomConsumptions(roomData);
-       setLastUpdate(new Date());
-     } catch (err) {
-       setError('Impossible de charger les données énergie (Spring Boot port 8084)');
-     } finally {
-       setIsLoading(false);
-     }
-   };
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const measurementsData = await getAllRecentMeasurements();
+        const energyData = await getEnergyComparison();
+        const roomData = await getEnergyConsumptionByRoom();
+        const activeRooms = await getActiveRoomsCount();
+        const activeSensors = await getActiveSensorsCount();
+        const usageData = await getConsumptionByUsage();
+        setMeasurements(measurementsData);
+        setEnergyComparison(energyData);
+        setRoomConsumptions(roomData);
+        setActiveRoomsCount(activeRooms);
+        setActiveSensorsCount(activeSensors);
+        setConsumptionByUsage(usageData);
+        setLastUpdate(new Date());
+      } catch (err) {
+        setError('Impossible de charger les données énergie (Spring Boot port 8084)');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
   const toggleRealtime = () => {
     if (isRealtime) {
@@ -144,9 +162,7 @@ export function EnergyView() {
     };
   }, []);
 
-  const energyMeasurements = measurements.filter(m => m.sensorType === 'energy');
-  const totalMwh = energyComparison ? (energyComparison.currentTotalKwh / 1000).toFixed(0) : '0';
-  const uniqueRooms = [...new Set(energyMeasurements.map(m => m.roomName))];
+   const energyMeasurements = measurements.filter(m => m.sensorType === 'energy');
 
    const chartData = energyMeasurements
      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -157,7 +173,22 @@ export function EnergyView() {
        room: m.roomName,
      }));
 
-   const top5 = roomConsumptions.slice(0, 5);
+    const totalMwh = energyComparison ? (energyComparison.currentTotalKwh / 1000).toFixed(0) : '0';
+
+    const top5 = roomConsumptions.slice(0, 5);
+
+    // Données pour le graphique "Consommation par usage"
+    const usageChartData = consumptionByUsage ? (displayMode === 'eur' ? [
+      { name: 'CVC', value: consumptionByUsage.cvcKwh * PRICE_PER_KWH, color: '#3b82f6' },
+      { name: 'Éclairage', value: consumptionByUsage.lightingKwh * PRICE_PER_KWH, color: '#f59e0b' },
+      { name: 'Équipements', value: consumptionByUsage.equipmentKwh * PRICE_PER_KWH, color: '#10b981' },
+      { name: 'Autres', value: consumptionByUsage.otherKwh * PRICE_PER_KWH, color: '#8b5cf6' },
+    ] : [
+      { name: 'CVC', value: consumptionByUsage.cvcKwh, color: '#3b82f6' },
+      { name: 'Éclairage', value: consumptionByUsage.lightingKwh, color: '#f59e0b' },
+      { name: 'Équipements', value: consumptionByUsage.equipmentKwh, color: '#10b981' },
+      { name: 'Autres', value: consumptionByUsage.otherKwh, color: '#8b5cf6' },
+    ]) : [];
 
   return (
     <div className="soft-page min-h-full p-8 space-y-8 relative overflow-hidden">
@@ -226,8 +257,8 @@ export function EnergyView() {
               shadowColor: 'shadow-blue-500/20'
             },
             {
-              label: 'Nb. compteurs actifs',
-              value: isLoading ? '...' : `${energyMeasurements.length}`,
+              label: 'Capteurs énergie actifs',
+              value: isLoading ? '...' : `${activeSensorsCount}`,
               unit: 'pts',
               icon: Sun,
               change: 0,
@@ -237,7 +268,7 @@ export function EnergyView() {
             },
             {
               label: 'Salles surveillées',
-              value: isLoading ? '...' : `${uniqueRooms.length}`,
+              value: isLoading ? '...' : `${activeRoomsCount}`,
               unit: 'salles',
               icon: TrendingDown,
               change: 0,
@@ -314,60 +345,31 @@ export function EnergyView() {
             </ResponsiveContainer>
           </div>
 
-          {/* Sources énergie */}
-          <div className="rounded-3xl p-7 bg-gradient-to-br from-zinc-900/90 via-zinc-900/70 to-zinc-950/90 border border-white/10 backdrop-blur-2xl shadow-2xl">
-            <h3 className="text-xl text-white mb-6">Sources d'énergie</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={sourceData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
-                  {sourceData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: 'rgba(24,24,27,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-3 mt-4">
-              {sourceData.map((source, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 rounded-lg" style={{ backgroundColor: source.color }} />
-                    <span className="text-sm text-zinc-300">{source.name}</span>
+          {/* Top consommateurs */}
+          <div className="rounded-3xl p-7 bg-gradient-to-br from-zinc-900/80 via-zinc-900/70 to-zinc-950/80 border border-white/10 backdrop-blur-2xl shadow-2xl">
+          <h3 className="text-xl text-white mb-1.5">Top consommateurs</h3>
+          <p className="text-sm text-zinc-400 mb-6">Top 5 des salles les plus consommatrices</p>
+            <div className="space-y-4">
+              {top5.map((m, index) => (
+                <div key={index} className="rounded-3xl p-5 bg-zinc-800/60 border border-zinc-600/30 shadow-inner">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">#{index + 1}</p>
+                      <p className="text-lg text-white font-semibold truncate">{m.roomName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl text-white font-bold">{(m.totalKwh / 1000).toFixed(2)}</p>
+                      <p className="text-xs text-zinc-300">MWh</p>
+                    </div>
                   </div>
-                  <span className="text-white">{source.value}%</span>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Top consommateurs */}
-        <div className="rounded-3xl p-7 bg-gradient-to-br from-zinc-900/90 via-zinc-900/70 to-zinc-950/90 border border-white/10 backdrop-blur-2xl shadow-2xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500">
-              <Lightbulb className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl text-white">Top consommateurs</h3>
-              <p className="text-sm text-zinc-400">Salles avec la plus haute consommation énergétique</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-5 gap-4">
-            {top5.map((m, i) => (
-              <div key={i} className="p-4 rounded-2xl bg-zinc-800/30 border border-zinc-700/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-zinc-500 text-xs">#{i + 1}</span>
-                  <span className="text-white text-sm font-medium truncate">{m.roomName}</span>
+              {top5.length === 0 && !isLoading && (
+                <div className="rounded-3xl p-6 bg-zinc-800/50 border border-zinc-700/30 text-zinc-400 text-center">
+                  Aucune salle disponible pour le moment
                 </div>
-                <p className="text-2xl text-white font-bold">{(m.totalKwh / 1000).toFixed(2)}</p>
-                <p className="text-zinc-400 text-xs">MWh</p>
-              </div>
-            ))}
-            {top5.length === 0 && !isLoading && (
-              <div className="col-span-5 text-center text-zinc-400 py-8">
-                Aucune donnée énergie disponible
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

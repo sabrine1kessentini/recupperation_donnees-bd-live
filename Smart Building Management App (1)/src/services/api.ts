@@ -1,7 +1,38 @@
 // src/services/api.ts
-// URL du backend Spring Boot
+// URLs for different backend services
 const SPRING_URL = import.meta.env.VITE_SPRING_URL || 'http://localhost:8084';
+const ALERT_SERVICE_URL = import.meta.env.VITE_ALERT_SERVICE_URL || 'http://localhost:8085';
 const ENERGY_ROOMS_URL = 'http://localhost:8080/api/energy/rooms';
+
+// ─── Helpers HTTP ─────────────────────────────────────────────────────────────
+
+async function get<T>(path: string, baseUrl: string = SPRING_URL): Promise<T> {
+  const res = await fetch(`${baseUrl}${path}`);
+  if (!res.ok) {
+    let errorMsg = `API error ${res.status} on ${path}`;
+    try {
+      const errorData = await res.json();
+      if (errorData.error) {
+        errorMsg = `${errorData.error}: ${errorData.path || path}`;
+      }
+    } catch {
+      // Ignore JSON parse errors in error response
+    }
+    throw new Error(errorMsg);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown, baseUrl: string = SPRING_URL): Promise<T> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status} on ${path}`);
+  return res.json() as Promise<T>;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SensorMeasurement = {
@@ -16,9 +47,21 @@ export type SensorMeasurement = {
   roomName: string;
 };
 
+export type SensorReading = SensorMeasurement; // Same shape for realtime
+
 export type TelemetryPoint = {
   timestamp: string;
   value: number | null;
+};
+
+export type SensorHistoryDto = {
+  sensorId: string;
+  sensorType: string;
+  label: string;
+  unit: string;
+  ifcGlobalId: string;
+  roomName: string;
+  points: TelemetryPoint[];
 };
 
 export type SensorHistorySeries = {
@@ -38,6 +81,9 @@ export type WaveonSession = {
   token: string;
   mode: string;
 };
+
+// Alias pour compatibilité avec l'API existante
+export type WaveonSessionInfo = WaveonSession;
 
 export type ZoneDto = {
   id: number;
@@ -115,22 +161,6 @@ export type ReservationRoomDto = {
   reservations: ReservationDto[];
 };
 
-export type EnergyComparisonDto = {
-  currentTotalKwh: number;
-  previousTotalKwh: number;
-  percentageChange: number;
-  currentTotalRaw: number;
-  previousTotalRaw: number;
-  currentPeakValue: number;
-  previousPeakValue: number;
-  peakPercentageChange: number;
-};
-
-export type RoomEnergyConsumptionDto = {
-  roomName: string;
-  totalKwh: number;
-};
-
 export type EnergyRoomApiDto = {
   roomName: string;
   value: number;
@@ -148,71 +178,99 @@ export type ReservationRequest = {
   endTime: string;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+export type EnergyComparisonDto = {
+  currentTotalKwh: number;
+  previousTotalKwh: number;
+  percentageChange: number;
+  currentTotalRaw: number;
+  previousTotalRaw: number;
+  currentPeakValue: number;
+  previousPeakValue: number;
+  peakPercentageChange: number;
+};
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${SPRING_URL}${path}`);
-  if (!res.ok) throw new Error(`API error ${res.status} on ${path}`);
-  return res.json() as Promise<T>;
-}
+export type RoomEnergyConsumptionDto = {
+  roomName: string;
+  totalKwh: number;
+};
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${SPRING_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+export type ConsumptionByUsageDto = {
+  cvcKwh: number;
+  lightingKwh: number;
+  equipmentKwh: number;
+  otherKwh: number;
+};
+
+// ─── Alert Types ────────────────────────────────────────────────────────────────
+
+export type AlertSeverity = 'CRITICAL' | 'MAJOR' | 'MINOR';
+export type AlertStatus = 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED';
+
+export type AlertDto = {
+  id: number;
+  equipmentId: string;
+  metricType: string;
+  value: number;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  message: string;
+  triggeredAt: string;
+  resolvedAt: string | null;
+};
+
+// ─── Alert API Functions ────────────────────────────────────────────────────────────
+
+export const getAllAlerts = (): Promise<AlertDto[]> =>
+  get('/api/alerts', ALERT_SERVICE_URL);
+
+export const acknowledgeAlert = (id: number): Promise<AlertDto> =>
+  fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/acknowledge`, { method: 'PUT' }).then(r => {
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    return r.json() as Promise<AlertDto>;
   });
-  if (!res.ok) {
-    const details = await res.json().catch(() => null);
-    throw new Error(details?.message || `API error ${res.status} on ${path}`);
-  }
-  return res.json() as Promise<T>;
-}
 
-// ─── Endpoints ────────────────────────────────────────────────────────────────
+export const resolveAlert = (id: number): Promise<AlertDto> =>
+  fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/resolve`, { method: 'PUT' }).then(r => {
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    return r.json() as Promise<AlertDto>;
+  });
 
-/** Teste la session WaveOn (token, mode, etc.) */
-export const getWaveonSession = (): Promise<WaveonSession> =>
-  get('/api/waveon/test-session');
-
-/** Données temps réel pour un capteur donné */
-export const getRealtimeData = (sensorId: string): Promise<SensorMeasurement[]> =>
-  get(`/api/realtime?sensorId=${encodeURIComponent(sensorId)}`);
-
-export const getAllRealtimeData = (): Promise<SensorMeasurement[]> =>
-  get('/api/realtime');
-
-export const getSensorHistory = (
-  sensorId: string,
-  hours = 24,
-  points = 24
-): Promise<SensorHistorySeries[]> =>
-  get(`/api/history?sensorId=${encodeURIComponent(sensorId)}&hours=${hours}&points=${points}`);
-
-/** Hiérarchie complète du bâtiment (sites → buildings → floors → zones) */
-export const getBuildingHierarchy = (): Promise<SiteHierarchyDto[]> =>
-  get('/api/buildings/hierarchy');
-
-/** Toutes les mesures récentes (tous capteurs) */
-export const getAllRecentMeasurements = (): Promise<SensorMeasurement[]> =>
-  get('/api/measurements/recent');
-
-/** Résumé des capteurs par zone */
-export const getSensorsByZone = (zoneId: number): Promise<SensorMeasurement[]> =>
-  get(`/api/zones/${zoneId}/sensors`);
-
-/** Espaces/salles issus du mapping WaveOn + IFC */
-export const getSpaces = (): Promise<SpaceSensorDto[]> =>
-  get('/api/spaces');
-
-export const getReservationRooms = (): Promise<ReservationRoomDto[]> =>
-  get('/api/reservations/rooms');
+// ─── API Functions ────────────────────────────────────────────────────────────
 
 export const getEnergyComparison = (): Promise<EnergyComparisonDto> =>
   get('/api/measurements/energy-comparison');
 
 export const getEnergyConsumptionByRoom = (): Promise<RoomEnergyConsumptionDto[]> =>
   get('/api/measurements/energy-by-room');
+
+export const getActiveRoomsCount = (): Promise<number> =>
+  get('/api/measurements/active-rooms-count');
+
+export const getActiveSensorsCount = (): Promise<number> =>
+  get('/api/measurements/active-sensors-count');
+
+export const getReservationRooms = (): Promise<ReservationRoomDto[]> =>
+  get('/api/reservations/rooms');
+
+export const getAllRecentMeasurements = (): Promise<SensorMeasurement[]> =>
+  get('/api/measurements/recent');
+
+export const getAllRealtimeData = (): Promise<SensorMeasurement[]> =>
+  get('/api/measurements/recent');
+
+export const getSensorHistory = (sensorId: string, hours: number, points: number): Promise<SensorHistoryDto[]> => {
+  const params = new URLSearchParams({ sensorId, hours: hours.toString(), points: points.toString() });
+  return fetch(`${SPRING_URL}/api/history?${params}`).then(r => {
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    return r.json() as Promise<SensorHistoryDto[]>;
+  });
+};
+
+export const getSpaces = (): Promise<SpaceSensorDto[]> =>
+  get('/api/spaces');
+
+export const getWaveonSession = (): Promise<WaveonSession> =>
+  get('/waveon/test-session');
 
 export const getEnergyRooms = async (): Promise<EnergyRoomApiDto[]> => {
   const res = await fetch(ENERGY_ROOMS_URL);
@@ -222,3 +280,6 @@ export const getEnergyRooms = async (): Promise<EnergyRoomApiDto[]> => {
 
 export const createReservation = (request: ReservationRequest): Promise<ReservationDto> =>
   post('/api/reservations', request);
+
+export const getConsumptionByUsage = (): Promise<ConsumptionByUsageDto> =>
+  get('/api/measurements/consumption-by-usage');

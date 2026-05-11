@@ -40,6 +40,23 @@ public interface SensorMeasurementRepository extends JpaRepository<SensorMeasure
             @Param("start") Instant start,
             @Param("end") Instant end);
 
+    @Query("SELECT COUNT(DISTINCT sm.sensorId) FROM SensorMeasurement sm WHERE sm.sensorType = :sensorType AND sm.measuredAt BETWEEN :start AND :end AND sm.value IS NOT NULL")
+    Long countDistinctSensorsBySensorTypeBetween(
+            @Param("sensorType") String sensorType,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
+    @Query("SELECT COUNT(DISTINCT sm.roomName) FROM SensorMeasurement sm WHERE sm.sensorType = :sensorType AND sm.measuredAt BETWEEN :start AND :end AND sm.value IS NOT NULL AND sm.roomName IS NOT NULL")
+    Long countDistinctRoomsBySensorTypeBetween(
+            @Param("sensorType") String sensorType,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
+    @Query("SELECT sm.sensorId, sm.label, SUM(sm.value) FROM SensorMeasurement sm WHERE sm.measuredAt BETWEEN :start AND :end AND sm.value IS NOT NULL GROUP BY sm.sensorId, sm.label")
+    List<Object[]> sumValueBySensorIdAndLabelBetween(
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
     default Double findMaxDailyEnergyConsumption(String sensorType, Instant start, Instant end) {
         List<SensorMeasurement> measurements = findBySensorTypeAndMeasuredAtBetweenOrderByMeasuredAtAsc(sensorType, start, end);
         if (measurements.isEmpty()) {

@@ -47,7 +47,7 @@ export default function DashboardView() {
                 {r.value} {r.unit}
               </td>
               <td className="p-2">{r.roomName}</td>
-              <td className="p-2">{new Date(r.measuredAt).toLocaleTimeString()}</td>
+              <td className="p-2">{new Date(r.timestamp).toLocaleTimeString()}</td>
             </tr>
           ))}
         </tbody>

@@ -8,12 +8,15 @@ type ZoneSummary = {
   temp: number | null;
   humidity: number | null;
   sensors: number;
+  sensorIds: Set<string>; // Ajouter un Set pour compter les capteurs uniques
 };
 
 export function EnvironmentView() {
   const [measurements, setMeasurements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [showAllHvac, setShowAllHvac] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -40,14 +43,21 @@ export function EnvironmentView() {
   const zoneMap = new Map<string, ZoneSummary>();
   measurements.forEach(m => {
     if (!zoneMap.has(m.roomName)) {
-      zoneMap.set(m.roomName, { name: m.roomName, temp: null, humidity: null, sensors: 0 });
+      zoneMap.set(m.roomName, { name: m.roomName, temp: null, humidity: null, sensors: 0, sensorIds: new Set<string>() });
     }
     const z = zoneMap.get(m.roomName)!;
-    z.sensors++;
+    z.sensorIds.add(m.sensorId); // Ajouter l'ID du capteur au Set
+    z.sensors = z.sensorIds.size; // Le nombre de capteurs = taille du Set
     if (m.sensorType === 'temperature') z.temp = m.value;
     if (m.sensorType === 'humidity') z.humidity = m.value;
   });
-  const zones = Array.from(zoneMap.values()).slice(0, 6);
+  // Filtrer les salles qui ont au moins une valeur non null et trier par nombre de capteurs décroissant
+  const allZones = Array.from(zoneMap.values())
+    .filter(zone => zone.temp !== null || zone.humidity !== null)
+    .sort((a, b) => b.sensors - a.sensors);
+
+  // Afficher seulement 6 salles initialement, ou toutes si showAll est true
+  const displayedZones = showAll ? allZones : allZones.slice(0, 6);
 
   // Courbe température (dernières mesures triées par timestamp)
   const tempHistory = measurements
@@ -105,7 +115,7 @@ export function EnvironmentView() {
               </div>
             </div>
           ))
-        ) : zones.length > 0 ? zones.map((zone, idx) => (
+        ) : displayedZones.length > 0 ? displayedZones.map((zone, idx) => (
           <div key={idx} className="bg-zinc-900/30 backdrop-blur-xl border border-zinc-800/50 rounded-xl p-5 hover:border-zinc-700/50 transition-all">
             <h3 className="text-white font-medium mb-4 truncate">{zone.name}</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -147,10 +157,22 @@ export function EnvironmentView() {
           </div>
         )) : (
           <div className="col-span-3 text-center text-zinc-400 py-12">
-            Aucune donnée de zone disponible
+            Aucune salle avec des données de capteurs disponibles
           </div>
         )}
       </div>
+
+      {/* Bouton Afficher plus */}
+      {!isLoading && allZones.length > 6 && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-800/50 hover:bg-zinc-700/50 text-white rounded-lg text-sm transition-all border border-zinc-600/30"
+          >
+            {showAll ? 'Afficher moins' : `Afficher plus (${allZones.length - 6} salles)`}
+          </button>
+        </div>
+      )}
 
       {/* Historical Charts */}
       <div className="grid grid-cols-2 gap-6">
@@ -200,13 +222,13 @@ export function EnvironmentView() {
       {/* HVAC Control - statique */}
       <div className="bg-zinc-900/30 backdrop-blur-xl border border-zinc-800/50 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-white mb-4">HVAC System Status</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {[
             { zone: 'Zone 1-2', status: 'Active', mode: 'Cooling', power: '75%' },
             { zone: 'Zone 3-4', status: 'Active', mode: 'Heating', power: '60%' },
             { zone: 'Zone 5-6', status: 'Standby', mode: 'Auto', power: '15%' },
             { zone: 'Basement', status: 'Active', mode: 'Ventilation', power: '40%' },
-          ].map((hvac, index) => (
+          ].slice(0, showAllHvac ? undefined : 3).map((hvac, index) => (
             <div key={index} className="p-4 bg-zinc-800/30 rounded-lg border border-zinc-800/50">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-white font-medium">{hvac.zone}</span>
@@ -220,6 +242,28 @@ export function EnvironmentView() {
             </div>
           ))}
         </div>
+
+        {/* Bouton Afficher plus pour HVAC */}
+        {[
+          { zone: 'Zone 1-2', status: 'Active', mode: 'Cooling', power: '75%' },
+          { zone: 'Zone 3-4', status: 'Active', mode: 'Heating', power: '60%' },
+          { zone: 'Zone 5-6', status: 'Standby', mode: 'Auto', power: '15%' },
+          { zone: 'Basement', status: 'Active', mode: 'Ventilation', power: '40%' },
+        ].length > 3 && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setShowAllHvac(!showAllHvac)}
+              className="flex items-center gap-2 px-6 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 text-white rounded-lg text-sm transition-all border border-zinc-600/30"
+            >
+              {showAllHvac ? 'Afficher moins' : `Afficher plus (${[
+                { zone: 'Zone 1-2', status: 'Active', mode: 'Cooling', power: '75%' },
+                { zone: 'Zone 3-4', status: 'Active', mode: 'Heating', power: '60%' },
+                { zone: 'Zone 5-6', status: 'Standby', mode: 'Auto', power: '15%' },
+                { zone: 'Basement', status: 'Active', mode: 'Ventilation', power: '40%' },
+              ].length - 3} zones)`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

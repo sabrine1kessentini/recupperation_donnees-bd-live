@@ -125,6 +125,9 @@ public class IfcParserService {
                 else if (line.contains("IFCRELCONTAINEDINSPATIALSTRUCTURE")) {
                     collectSpatialRelation(line, spaceToStoreyRef);
                 }
+                else if (line.contains("IFCRELAGGREGATES")) {
+                    collectAggregateRelation(line, spaceToStoreyRef);
+                }
                 // Extract IFCDEVICE (Equipment)
                 else if (line.contains("IFCDEVICE")) {
                     IfcElement device = parseIfcElement(line, "IFCDEVICE");
@@ -212,6 +215,23 @@ public class IfcParserService {
             }
         } catch (Exception ignored) {
             // Keep the parser permissive: missing storey data should not hide rooms.
+        }
+    }
+
+    private void collectAggregateRelation(String line, Map<String, String> spaceToStoreyRef) {
+        try {
+            List<String> args = extractArguments(line, "IFCRELAGGREGATES");
+            if (args.size() < 6) {
+                return;
+            }
+
+            String relatingObject = args.get(4).trim();
+            String relatedObjects = args.get(5).trim();
+            for (String ref : extractRefs(relatedObjects)) {
+                spaceToStoreyRef.put(ref, relatingObject);
+            }
+        } catch (Exception ignored) {
+            // IFC files are often noisy; bad aggregate relations should not block parsing.
         }
     }
 

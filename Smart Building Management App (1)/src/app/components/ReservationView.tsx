@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Users } from 'lucide-react';
+import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Ruler } from 'lucide-react';
 import { createReservation, getReservationRooms, type ReservationRoomDto } from '../../services/api';
+
+const ALLOWED_ROOMS = new Set(['B109', 'B152', 'B135', 'B119', 'B111', 'B123', 'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139']);
 
 type RoomStatus = 'available' | 'reserved';
 
@@ -30,6 +32,29 @@ const toRoom = (room: ReservationRoomDto): MeetingRoom => ({
   reservations: room.reservations,
 });
 
+const timeToMinutes = (time: string) => {
+  const [hours = '0', minutes = '0'] = time.split(':');
+  return Number(hours) * 60 + Number(minutes);
+};
+
+const getOverlappingReservation = (room: MeetingRoom, date: string, startTime: string, endTime: string) =>
+  room.reservations.find((reservation) => {
+    if (reservation.date !== date) {
+      return false;
+    }
+
+    return timeToMinutes(startTime) < timeToMinutes(reservation.endTime)
+      && timeToMinutes(endTime) > timeToMinutes(reservation.startTime);
+  });
+
+const overlapsReservation = (room: MeetingRoom, date: string, startTime: string, endTime: string) =>
+  Boolean(getOverlappingReservation(room, date, startTime, endTime));
+
+const formatDate = (value: string) => {
+  const [year, month, day] = value.split('-');
+  return day && month && year ? `${day}/${month}/${year}` : value;
+};
+
 export function ReservationView() {
   const [rooms, setRooms] = useState<MeetingRoom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -38,30 +63,34 @@ export function ReservationView() {
   const [endTime, setEndTime] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [country, setCountry] = useState('Tunisie'); // valeur par défaut
+  const [country, setCountry] = useState('Tunisie');
   const [phone, setPhone] = useState('+216');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const countryPrefixes: Record<string, string> = {
-  Tunisie: '+216',
-  France: '+33',
-  Maroc: '+212',
-  Algérie: '+213',
-  USA: '+1',
-};
   const [message, setMessage] = useState<string | null>(null);
+
+  const countryPrefixes: Record<string, string> = {
+    Tunisie: '+216',
+    France: '+33',
+    Maroc: '+212',
+    Algerie: '+213',
+    USA: '+1',
+  };
 
   const loadRooms = async () => {
     setIsLoading(true);
     try {
       const data = await getReservationRooms();
-      setRooms(data.map(toRoom));
-      if (data.length === 0) {
-        setMessage('Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne et que la base de donnees "buildingdb" contient les zones.');
-      } else {
-        setMessage(null);
-      }
+      const filtered = data
+        .filter((room) => ALLOWED_ROOMS.has(room.name))
+        .filter((room, index, self) => index === self.findIndex((r) => r.ifcGlobalId === room.ifcGlobalId))
+        .map(toRoom);
+
+      setRooms(filtered);
+      setMessage(filtered.length === 0
+        ? 'Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne et que la base de donnees "buildingdb" contient les zones.'
+        : null);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Impossible de charger les salles IFC.';
       if (msg.includes('500')) {
@@ -85,36 +114,25 @@ export function ReservationView() {
     [rooms, selectedRoomId]
   );
 
-  const getStatusUi = (status: RoomStatus) => {
-    if (status === 'available') {
+  const getStatusUi = (isReservedForSelectedSlot: boolean) => {
+    if (!isReservedForSelectedSlot) {
       return {
         label: 'Disponible',
-        classes: 'bg-green-500/15 text-green-400 border-green-500/30',
+        classes: 'bg-green-50 text-green-700 border-green-200',
         icon: <CheckCircle2 className="h-4 w-4" />,
       };
     }
-    if (status === 'reserved') {
-      return {
-        label: 'Reservee',
-        classes: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-        icon: <Clock3 className="h-4 w-4" />,
-      };
-    }
-    // Default fallback
+
     return {
-      label: 'Inconnu',
-      classes: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
-      icon: <CircleAlert className="h-4 w-4" />,
+      label: 'Reservee',
+      classes: 'bg-amber-50 text-amber-700 border-amber-200',
+      icon: <Clock3 className="h-4 w-4" />,
     };
   };
 
   const handleReserve = async () => {
     if (!selectedRoom) {
-      setMessage('Selectionnez une salle disponible.');
-      return;
-    }
-    if (selectedRoom.status !== 'available') {
-      setMessage('Cette salle n est pas disponible.');
+      setMessage('Selectionnez une salle.');
       return;
     }
     if (!date || !startTime || !endTime) {
@@ -123,6 +141,10 @@ export function ReservationView() {
     }
     if (startTime >= endTime) {
       setMessage('L heure de fin doit etre apres l heure de debut.');
+      return;
+    }
+    if (overlapsReservation(selectedRoom, date, startTime, endTime)) {
+      setMessage('Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.');
       return;
     }
 
@@ -142,52 +164,53 @@ export function ReservationView() {
       await loadRooms();
       setMessage(`Reservation confirmee pour ${selectedRoom.displayName} le ${date} de ${startTime} a ${endTime}.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Reservation impossible.');
+      const msg = error instanceof Error ? error.message : 'Reservation impossible.';
+      setMessage(msg.includes('409') ? 'Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.' : msg);
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="soft-page p-8 space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Reservation des salles</h2>
-        <p className="text-zinc-400">Selectionnez une salle, date et heure pour reserver votre reunion</p>
+    <div className="min-h-screen bg-slate-50 p-8 text-slate-900">
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-slate-950 mb-2">Reservation des salles</h2>
+        <p className="text-slate-600">Selectionnez une salle, date et heure pour reserver votre reunion</p>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-4">
           {isLoading && (
-            <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-5 text-sm text-zinc-300">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
               Chargement des salles IFC...
             </div>
           )}
 
           {!isLoading && rooms.length === 0 && (
-            <div className="rounded-xl border border-zinc-800/50 bg-zinc-900/30 p-5 text-sm text-zinc-300">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
               Aucune salle IFC trouvee.
             </div>
           )}
 
           {rooms.map((room) => {
-            const statusUi = getStatusUi(room.status);
+            const overlappingReservation = date && startTime && endTime
+              ? getOverlappingReservation(room, date, startTime, endTime)
+              : null;
+            const statusUi = getStatusUi(Boolean(overlappingReservation));
             const isActive = selectedRoomId === room.id;
-            const canReserve = room.status === 'available';
 
             return (
               <div
                 key={room.id}
-                className={`rounded-xl border p-5 backdrop-blur-xl transition-all ${
-                  isActive
-                    ? 'bg-zinc-900/40 border-blue-500/40'
-                    : 'bg-zinc-900/30 border-zinc-800/50'
+                className={`rounded-xl border bg-white p-5 shadow-sm transition-all ${
+                  isActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-white text-lg font-semibold">{room.displayName}</h3>
-                    <p className="text-zinc-400 text-sm mt-1">{room.code} - {room.floor}</p>
-                    <p className="text-zinc-500 text-xs mt-1">{room.location}</p>
+                    <h3 className="text-lg font-semibold text-slate-950">{room.displayName}</h3>
+                    <p className="text-sm text-slate-600 mt-1">{room.code} - {room.floor}</p>
+                    <p className="text-xs text-slate-500 mt-1">{room.location}</p>
                   </div>
 
                   <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusUi.classes}`}>
@@ -196,46 +219,42 @@ export function ReservationView() {
                   </span>
                 </div>
 
-                <div className="mt-4 flex items-center gap-5 text-sm">
-                  <span className="inline-flex items-center gap-2 text-zinc-300">
-                    <Users className="h-4 w-4 text-zinc-400" />
-                    {room.capacity}
+                <div className="mt-4 flex flex-wrap items-center gap-5 text-sm">
+                  <span className="inline-flex items-center gap-2 text-slate-700">
+                    <Ruler className="h-4 w-4 text-slate-500" />
+                    Surface: {room.capacity}
                   </span>
-                  <span className="inline-flex items-center gap-2 text-zinc-300">
-                    <MapPin className="h-4 w-4 text-zinc-400" />
+                  <span className="inline-flex items-center gap-2 text-slate-700">
+                    <MapPin className="h-4 w-4 text-slate-500" />
                     {room.floor}
                   </span>
-                  {room.reservedSlot && (
-                    <span className="inline-flex items-center gap-2 text-zinc-300">
-                      <Clock3 className="h-4 w-4 text-zinc-400" />
-                      {room.reservedSlot}
+                  {overlappingReservation && (
+                    <span className="inline-flex items-center gap-2 text-slate-700">
+                      <Clock3 className="h-4 w-4 text-slate-500" />
+                      Reservee de {overlappingReservation.startTime} a {overlappingReservation.endTime}
                     </span>
                   )}
                 </div>
 
                 <div className="mt-4">
                   <button
-                    onClick={() => canReserve && setSelectedRoomId(room.id)}
-                    disabled={!canReserve}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                      canReserve
-                        ? 'bg-[#f4b400] text-white hover:bg-[#e1a600]'
-                        : 'bg-zinc-700/60 text-zinc-400 cursor-not-allowed'
-                    }`}
-                    >
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className="rounded-lg bg-[#f4b400] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#e1a600]"
+                  >
                     Reserver
                   </button>
                 </div>
 
                 {room.reservations.length > 0 && (
-                  <div className="mt-4 rounded-lg border border-zinc-800/60 bg-zinc-950/30 p-3">
-                    <p className="text-xs font-medium text-zinc-400">Reservations</p>
-                    <div className="mt-2 space-y-1">
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-medium text-slate-600">Reservations</p>
+                    <div className="mt-2 space-y-2">
                       {room.reservations.slice(0, 3).map((reservation) => (
-                        <p key={reservation.id} className="text-xs text-zinc-300">
-                          {reservation.reservedSlot}
-                          {reservation.reservedBy ? ` - ${reservation.reservedBy}` : ''}
-                        </p>
+                        <div key={reservation.id} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+                          <p className="font-medium text-slate-900">{formatDate(reservation.date)}</p>
+                          <p className="mt-1">Debut: {reservation.startTime} - Fin: {reservation.endTime}</p>
+                          {reservation.reservedBy && <p className="mt-1 text-slate-500">{reservation.reservedBy}</p>}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -245,109 +264,112 @@ export function ReservationView() {
           })}
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 backdrop-blur-xl border border-zinc-800/50 p-5 h-fit sticky top-6">
-          <div className="flex items-center gap-2 text-white mb-4">
+        <div className="h-fit sticky top-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2 text-slate-950">
             <CalendarClock className="h-5 w-5 text-[#f4b400]" />
             <h3 className="font-semibold">Nouvelle reservation</h3>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="text-xs text-zinc-400">Salle choisie</label>
-              <div className="mt-1 rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200">
+              <label className="text-xs text-slate-600">Salle choisie</label>
+              <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
                 {selectedRoom ? `${selectedRoom.displayName} (${selectedRoom.code})` : 'Aucune salle selectionnee'}
               </div>
             </div>
 
-<div className="grid grid-cols-2 gap-3">
-  <div>
-    <label className="text-xs text-zinc-400">Nom</label>
-    <input
-      type="text"
-      placeholder="Entrer votre nom"
-      value={lastName}
-      onChange={(e) => setLastName(e.target.value)}
-      className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
-    />
-  </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-600">Nom</label>
+                <input
+                  type="text"
+                  placeholder="Entrer votre nom"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                />
+              </div>
 
-  <div>
-    <label className="text-xs text-zinc-400">Prénom</label>
-    <input
-      type="text"
-      placeholder="Entrer votre prénom"
-      value={firstName}
-      onChange={(e) => setFirstName(e.target.value)}
-      className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
-    />
-  </div>
-</div>
-<div>
-  <label className="text-xs text-zinc-400">Email</label>
-  <input
-    type="email"
-    value={email}
-    onChange={(e) => setEmail(e.target.value)}
-    placeholder="exemple@domaine.com"
-    className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
-  />
-</div>
-<div>
-  <label className="text-xs text-zinc-400">Pays</label>
-  <select
-    value={country}
-    onChange={(e) => {
-      const selected = e.target.value;
-      setCountry(selected);
-      setPhone(countryPrefixes[selected] || ''); // met le préfixe automatiquement
-    }}
-    className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
-  >
-    <option value="Tunisie">Tunisie</option>
-    <option value="France">France</option>
-    <option value="Maroc">Maroc</option>
-    <option value="Algérie">Algérie</option>
-    <option value="USA">USA</option>
-  </select>
-</div>
+              <div>
+                <label className="text-xs text-slate-600">Prenom</label>
+                <input
+                  type="text"
+                  placeholder="Entrer votre prenom"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                />
+              </div>
+            </div>
 
-<div>
-  <label className="text-xs text-zinc-400">Numéro de téléphone</label>
-  <input
-    type="tel"
-    value={phone}
-    onChange={(e) => setPhone(e.target.value)}
-    placeholder={`${countryPrefixes[country]} XX XXX XXX`}
-    className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
-  />
-</div>
             <div>
-              <label className="text-xs text-zinc-400">Date</label>
+              <label className="text-xs text-slate-600">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="exemple@domaine.com"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-600">Pays</label>
+              <select
+                value={country}
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  setCountry(selected);
+                  setPhone(countryPrefixes[selected] || '');
+                }}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+              >
+                <option value="Tunisie">Tunisie</option>
+                <option value="France">France</option>
+                <option value="Maroc">Maroc</option>
+                <option value="Algerie">Algerie</option>
+                <option value="USA">USA</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-600">Numero de telephone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={`${countryPrefixes[country]} XX XXX XXX`}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-600">Date</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-400">Debut</label>
+                <label className="text-xs text-slate-600">Debut</label>
                 <input
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400">Fin</label>
+                <label className="text-xs text-slate-600">Fin</label>
                 <input
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#f4b400]"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
                 />
               </div>
             </div>
@@ -355,13 +377,13 @@ export function ReservationView() {
             <button
               onClick={handleReserve}
               disabled={isSaving}
-              className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-zinc-700/60 disabled:text-zinc-400"
+              className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
             >
               {isSaving ? 'Reservation...' : 'Confirmer reservation'}
             </button>
 
             {message && (
-              <div className="rounded-lg border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-300 inline-flex items-start gap-2">
+              <div className="inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                 <CircleAlert className="h-4 w-4 mt-0.5 text-[#f4b400]" />
                 <span>{message}</span>
               </div>

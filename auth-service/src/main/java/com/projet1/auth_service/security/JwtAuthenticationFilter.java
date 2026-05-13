@@ -30,6 +30,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        return path.startsWith("/auth/login") || 
+               path.startsWith("/auth/signup") || 
+               path.startsWith("/auth/LoginClientService") ||
+               path.startsWith("/.well-known/");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String h = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (StringUtils.hasText(h) && h.startsWith("Bearer ")) {

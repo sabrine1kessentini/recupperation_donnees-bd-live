@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.digitaltwin.building_service.service.WaveonFusionServiceTest
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.225 s -- in com.digitaltwin.building_service.service.WaveonFusionServiceTest

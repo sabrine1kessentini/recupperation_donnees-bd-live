@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
-import  DashboardView  from './components/DashboardView';
-import { DashboardViewOccupant }   from './components/DashboardViewOccupant';
+import DashboardViewOccupant from './components/DashboardViewOccupant';
+import { DashboardView } from './components/DashboardView';
 import { EnergyView } from './components/EnergyView';
 import { EnvironmentView } from './components/EnvironmentView';
 import { BuildingView } from './components/BuildingView';
@@ -11,6 +11,7 @@ import { OccupancyView } from './components/OccupancyView';
 import { AuthView } from './components/AuthView';
 import { ReservationView } from './components/ReservationView';
 import { RoomView } from './components/RoomView';
+import { isAuthenticated as checkAuth, getRoles } from '../utils/auth';
 
 type DashboardProps = {
   onOpenRoom?: (roomName: string) => void;
@@ -18,16 +19,29 @@ type DashboardProps = {
 
 type DashboardViewProps = DashboardProps;
 
+const DigitalTwinView = () => (
+  <div className="p-4 md:p-6">
+    <h1 className="text-2xl font-bold mb-4">Digital Twin</h1>
+    <p>Digital twin visualization coming soon...</p>
+  </div>
+);
+
 export default function App() {
-  const [activeView, setActiveView] = useState('dashboard');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const roles = getRoles();
+  const isOccupant = roles.includes('ROLE_OCCUPANT') && roles.length === 1;
+  const [activeView, setActiveView] = useState(() => checkAuth() ? (isOccupant ? 'digitalTwin' : 'dashboard') : 'dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => checkAuth());
 
   const renderView = () => {
+    const roles = getRoles();
+    const isAdmin = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPERADMIN');
+    const isOccupant = roles.includes('ROLE_OCCUPANT');
+    const DefaultDashboard = isAdmin ? DashboardView : DashboardViewOccupant;
+
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
       case 'dashboard-occupant':
-        return <DashboardViewOccupant onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
+        return <DefaultDashboard onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
       case 'room-b109':
         return <RoomView roomName="B109" onBack={() => setActiveView('dashboard')} />;
       case 'energy':
@@ -44,8 +58,10 @@ export default function App() {
         return <OccupancyView />;
       case 'reservation':
         return <ReservationView />;
+      case 'digitalTwin':
+        return <DigitalTwinView />;
       default:
-        return <DashboardView onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
+        return <DefaultDashboard onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
     }
   };
 

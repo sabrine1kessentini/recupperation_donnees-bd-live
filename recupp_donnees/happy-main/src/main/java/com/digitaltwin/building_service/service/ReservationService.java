@@ -1,396 +1,198 @@
 package com.digitaltwin.building_service.service;
 
-import com.digitaltwin.building_service.domain.BuildingStructure;
-import com.digitaltwin.building_service.domain.Floor;
 import com.digitaltwin.building_service.domain.RoomReservation;
-import com.digitaltwin.building_service.domain.Site;
-import com.digitaltwin.building_service.domain.Zone;
 import com.digitaltwin.building_service.dto.ReservationDto;
 import com.digitaltwin.building_service.dto.ReservationRequestDto;
 import com.digitaltwin.building_service.dto.ReservationRoomDto;
-import com.digitaltwin.building_service.dto.SpaceSensorDto;
 import com.digitaltwin.building_service.repository.RoomReservationRepository;
-import com.digitaltwin.building_service.repository.ZoneRepository;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReservationService {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final long ROOM_CACHE_TTL_MS = 60_000;
 
     private final RoomReservationRepository reservationRepository;
-    private final WaveonFusionService waveonFusionService;
     private final IfcParserService ifcParserService;
-    private final ZoneRepository zoneRepository;
-    private List<ReservationRoomSource> cachedRoomSources;
-    private long cachedRoomSourcesAt;
+    private final ObjectMapper objectMapper;
+
+    @Value("${building.mapping.path}")
+    private String mappingPath;
 
     @Transactional(readOnly = true)
     public List<ReservationRoomDto> getReservationRooms() {
-        List<ReservationRoomSource> rooms = getIfcRooms();
         LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
+        List<RoomReservation> currentReservations = reservationRepository.findAll()
+                .stream()
+                .filter(r -> !r.getReservationDate().isBefore(today.minusDays(1)))
+                .toList();
 
-        return rooms.stream()
-                .sorted(Comparator.comparing(room -> valueOrDefault(room.name(), "")))
-                .map(room -> toReservationRoom(room, today, now))
+        List<IfcParserService.IfcElement> spaces = ifcParserService.extractSpaces();
+        List<MappingRoom> mappings = loadMappings();
+        Map<String, MappingRoom> mappingsByGlobalId = mappings.stream()
+                .filter(room -> room.ifcGlobalId != null)
+                .collect(Collectors.toMap(room -> room.ifcGlobalId, room -> room, (a, b) -> a, LinkedHashMap::new));
+        Map<String, MappingRoom> mappingsByName = mappings.stream()
+                .filter(room -> room.ifcName != null)
+                .collect(Collectors.toMap(room -> normalize(room.ifcName), room -> room, (a, b) -> a, LinkedHashMap::new));
+
+        Map<String, List<ReservationDto>> reservationsByRoom = currentReservations.stream()
+                .map(this::toDto)
+                .collect(Collectors.groupingBy(ReservationDto::ifcGlobalId));
+
+        return spaces.stream()
+                .collect(Collectors.toMap(
+                        IfcParserService.IfcElement::getName,
+                        space -> {
+                            String ifcGlobalId = space.getGlobalId();
+                            MappingRoom mapping = mappingsByGlobalId.get(ifcGlobalId);
+                            if (mapping == null) {
+                                mapping = mappingsByName.get(normalize(space.getName()));
+                            }
+                            List<ReservationDto> roomReservations = reservationsByRoom.getOrDefault(ifcGlobalId, List.of());
+
+                            ReservationDto currentReservation = roomReservations.stream()
+                                    .filter(r -> r.date().equals(today) || r.date().isAfter(today.minusDays(1)))
+                                    .max(Comparator.comparing(ReservationDto::startTime))
+                                    .orElse(null);
+
+                            String status = currentReservation != null ? "reserved" : "available";
+
+                            String reservedSlot = currentReservation != null
+                                    ? currentReservation.startTime().format(TIME_FORMATTER) + "-" + currentReservation.endTime().format(TIME_FORMATTER)
+                                    : null;
+
+                            return new ReservationRoomDto(
+                                    ifcGlobalId,
+                                    space.getName(),
+                                    space.getLongName(),
+                                    space.getStorey(),
+                                    null,
+                                    mapping != null ? mapping.areaM2 : null,
+                                    status,
+                                    reservedSlot,
+                                    currentReservation,
+                                    roomReservations
+                            );
+                        },
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new
+                ))
+                .values()
+                .stream()
+                .sorted(Comparator.comparing(ReservationRoomDto::name))
                 .toList();
     }
 
-    @Transactional
     public ReservationDto createReservation(ReservationRequestDto request) {
-        validateRequest(request);
-        ReservationRoomSource room = findRoom(request.ifcGlobalId());
-
-        List<RoomReservation> overlaps = reservationRepository.findOverlappingReservations(
+        List<RoomReservation> overlapping = reservationRepository.findOverlappingReservations(
                 request.ifcGlobalId(),
                 request.date(),
                 request.startTime(),
                 request.endTime()
         );
-        if (!overlaps.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette salle est deja reservee sur ce creneau.");
+
+        if (!overlapping.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Time slot already reserved");
         }
 
-        RoomReservation reservation = new RoomReservation();
-        reservation.setIfcGlobalId(room.ifcGlobalId());
-        reservation.setRoomName(valueOrDefault(room.name(), room.ifcGlobalId()));
-        reservation.setRoomLongName(room.longName());
-        reservation.setStorey(room.storey());
-        reservation.setLocation(room.location());
-        reservation.setReservationDate(request.date());
-        reservation.setStartTime(request.startTime());
-        reservation.setEndTime(request.endTime());
-        reservation.setFirstName(trimToNull(request.firstName()));
-        reservation.setLastName(trimToNull(request.lastName()));
-        reservation.setCountry(trimToNull(request.country()));
-        reservation.setPhone(trimToNull(request.phone()));
-        reservation.setEmail(trimToNull(request.email()));
-        reservation.setCreatedAt(LocalDateTime.now());
+        RoomReservation entity = new RoomReservation();
+        entity.setIfcGlobalId(request.ifcGlobalId());
+        entity.setReservationDate(request.date());
+        entity.setStartTime(request.startTime());
+        entity.setEndTime(request.endTime());
+        entity.setFirstName(request.firstName());
+        entity.setLastName(request.lastName());
+        entity.setCountry(request.country());
+        entity.setPhone(request.phone());
+        entity.setEmail(request.email());
+        entity.setCreatedAt(LocalDateTime.now());
 
-        return toDto(reservationRepository.save(reservation));
-    }
-
-    @Transactional(readOnly = true)
-    public List<ReservationDto> getReservations(String ifcGlobalId) {
-        if (isBlank(ifcGlobalId)) {
-            return reservationRepository.findAll().stream()
-                    .sorted(Comparator
-                            .comparing(RoomReservation::getReservationDate)
-                            .thenComparing(RoomReservation::getStartTime))
-                    .map(this::toDto)
-                    .toList();
-        }
-
-        return reservationRepository.findByIfcGlobalIdOrderByReservationDateAscStartTimeAsc(ifcGlobalId)
-                .stream()
-                .map(this::toDto)
-                .toList();
-    }
-
-    private ReservationRoomDto toReservationRoom(ReservationRoomSource room, LocalDate today, LocalTime now) {
-        List<ReservationDto> reservations = reservationRepository
-                .findByIfcGlobalIdOrderByReservationDateAscStartTimeAsc(room.ifcGlobalId())
-                .stream()
-                .map(this::toDto)
-                .toList();
-
-        ReservationDto current = reservations.stream()
-                .filter(reservation -> isCurrentOrFuture(reservation, today, now))
+        IfcParserService.IfcElement space = ifcParserService.extractSpaces().stream()
+                .filter(s -> s.getGlobalId().equals(request.ifcGlobalId()))
                 .findFirst()
                 .orElse(null);
 
-        return new ReservationRoomDto(
-                room.ifcGlobalId(),
-                valueOrDefault(room.name(), room.ifcGlobalId()),
-                room.longName(),
-                room.storey(),
-                room.location(),
-                room.areaM2(),
-                current == null ? "available" : "reserved",
-                current == null ? null : current.reservedSlot(),
-                current,
-                reservations
-        );
+        if (space != null) {
+            entity.setRoomName(space.getName());
+            entity.setRoomLongName(space.getLongName());
+            entity.setStorey(space.getStorey());
+        }
+
+        RoomReservation saved = reservationRepository.save(entity);
+        return toDto(saved);
     }
 
-    private boolean isCurrentOrFuture(ReservationDto reservation, LocalDate today, LocalTime now) {
-        if (reservation.date().isAfter(today)) {
-            return true;
-        }
-        return reservation.date().isEqual(today) && reservation.endTime().isAfter(now);
-    }
-
-    private ReservationRoomSource findRoom(String ifcGlobalId) {
-        return getIfcRooms().stream()
-                .filter(room -> room.ifcGlobalId().equals(ifcGlobalId))
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Salle IFC introuvable."));
-    }
-
-    private List<ReservationRoomSource> getIfcRooms() {
-        long now = System.currentTimeMillis();
-        if (cachedRoomSources != null && now - cachedRoomSourcesAt < ROOM_CACHE_TTL_MS) {
-            return cachedRoomSources;
-        }
-
-        List<ReservationRoomSource> rooms = loadRoomSources();
-        cachedRoomSources = rooms;
-        cachedRoomSourcesAt = now;
-        return rooms;
-    }
-
-    private List<ReservationRoomSource> loadRoomSources() {
-        Map<String, SpaceSensorDto> mappedSpaces = getMappedSpacesByGlobalId();
-        Map<String, DbRoomInfo> dbRoomsByName = getDbRoomsByName();
-
-        List<ReservationRoomSource> rooms = ifcParserService.extractSpaces().stream()
-                .filter(space -> !isBlank(space.getGlobalId()))
-                .map(space -> {
-                    SpaceSensorDto mapped = mappedSpaces.get(space.getGlobalId());
-                    String name = valueOrDefault(
-                            mapped != null ? mapped.ifcName() : null,
-                            valueOrDefault(space.getName(), space.getGlobalId())
-                    );
-                    DbRoomInfo dbRoom = dbRoomsByName.get(normalize(name));
-                    String longName = valueOrDefault(
-                            mapped != null ? mapped.ifcLongName() : null,
-                            space.getLongName()
-                    );
-                    String storey = valueOrDefault(
-                            cleanStorey(mapped != null ? mapped.storey() : null),
-                            valueOrDefault(cleanStorey(space.getStorey()), dbRoom != null ? dbRoom.floorName() : null)
-                    );
-                    String location = dbRoom != null && hasUsefulDbLocation(dbRoom.location())
-                            ? dbRoom.location()
-                            : buildLocation(storey);
-                    Double areaM2 = mapped != null ? mapped.areaM2() : null;
-
-                    return new ReservationRoomSource(
-                            space.getGlobalId(),
-                            name,
-                            longName,
-                            storey,
-                            location,
-                            areaM2
-                    );
-                })
-                .collect(Collectors.toMap(
-                        room -> normalize(room.name()),
-                        Function.identity(),
-                        this::chooseBetterRoomSource,
-                        LinkedHashMap::new
-                ))
-                .values()
-                .stream()
-                .toList();
-
-        if (!rooms.isEmpty()) {
-            return rooms;
-        }
-
-        return mappedSpaces.values().stream()
-                .map(space -> new ReservationRoomSource(
-                        space.ifcGlobalId(),
-                        valueOrDefault(space.ifcName(), space.ifcGlobalId()),
-                        space.ifcLongName(),
-                        cleanStorey(space.storey()),
-                        buildLocation(cleanStorey(space.storey())),
-                        space.areaM2()
-                ))
-                .toList();
-    }
-
-    private ReservationRoomSource chooseBetterRoomSource(ReservationRoomSource current, ReservationRoomSource candidate) {
-        if (isBlank(current.longName()) && !isBlank(candidate.longName())) {
-            return candidate;
-        }
-        if (isBlank(current.storey()) && !isBlank(candidate.storey())) {
-            return candidate;
-        }
-        if (current.areaM2() == null && candidate.areaM2() != null) {
-            return candidate;
-        }
-        return current;
-    }
-
-    private Map<String, SpaceSensorDto> getMappedSpacesByGlobalId() {
-        try {
-            return waveonFusionService.getSpaces().stream()
-                    .filter(space -> !isBlank(space.ifcGlobalId()))
-                    .collect(Collectors.toMap(
-                            SpaceSensorDto::ifcGlobalId,
-                            Function.identity(),
-                            (a, b) -> a,
-                            LinkedHashMap::new
-                    ));
-        } catch (RuntimeException ignored) {
-            return Map.of();
-        }
-    }
-
-    private Map<String, DbRoomInfo> getDbRoomsByName() {
-        return zoneRepository.findAll().stream()
-                .filter(zone -> !isBlank(zone.getName()))
-                .map(this::toDbRoomInfo)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(
-                        room -> normalize(room.roomName()),
-                        Function.identity(),
-                        this::chooseBetterDbRoom,
-                        LinkedHashMap::new
-                ));
-    }
-
-    private DbRoomInfo toDbRoomInfo(Zone zone) {
-        Floor floor = zone.getFloor();
-        BuildingStructure building = floor != null ? floor.getBuilding() : null;
-        Site site = building != null ? building.getSite() : null;
-
-        String floorName = floor != null ? cleanStorey(floor.getName()) : null;
-        String location = buildDbLocation(site, building, floorName);
-
-        return new DbRoomInfo(zone.getName(), floorName, location);
-    }
-
-    private DbRoomInfo chooseBetterDbRoom(DbRoomInfo current, DbRoomInfo candidate) {
-        if (isBlank(current.floorName()) && !isBlank(candidate.floorName())) {
-            return candidate;
-        }
-        if (isBlank(current.location()) && !isBlank(candidate.location())) {
-            return candidate;
-        }
-        return current;
-    }
-
-    private void validateRequest(ReservationRequestDto request) {
-        if (request == null || isBlank(request.ifcGlobalId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selectionnez une salle.");
-        }
-        if (request.date() == null || request.startTime() == null || request.endTime() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choisissez la date et les heures de debut/fin.");
-        }
-        if (!request.endTime().isAfter(request.startTime())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L heure de fin doit etre apres l heure de debut.");
-        }
-    }
-
-    private ReservationDto toDto(RoomReservation reservation) {
-        String reservedBy = String.join(" ",
-                valueOrDefault(reservation.getFirstName(), ""),
-                valueOrDefault(reservation.getLastName(), "")
-        ).trim();
-
+    private ReservationDto toDto(RoomReservation r) {
         return new ReservationDto(
-                reservation.getId(),
-                reservation.getIfcGlobalId(),
-                reservation.getRoomName(),
-                reservation.getRoomLongName(),
-                reservation.getStorey(),
-                reservation.getLocation(),
-                reservation.getReservationDate(),
-                reservation.getStartTime(),
-                reservation.getEndTime(),
-                formatSlot(reservation.getReservationDate(), reservation.getStartTime(), reservation.getEndTime()),
-                reservedBy.isBlank() ? null : reservedBy,
-                reservation.getEmail(),
-                reservation.getPhone()
+                r.getId(),
+                r.getIfcGlobalId(),
+                r.getRoomName(),
+                r.getRoomLongName(),
+                r.getStorey(),
+                r.getLocation(),
+                r.getReservationDate(),
+                r.getStartTime(),
+                r.getEndTime(),
+                r.getStartTime().format(TIME_FORMATTER) + "-" + r.getEndTime().format(TIME_FORMATTER),
+                r.getFirstName() + " " + r.getLastName(),
+                r.getEmail(),
+                r.getPhone()
         );
     }
 
-    private String buildLocation(String storey) {
-        if (isBlank(storey)) {
-            return "IFC";
+    private List<MappingRoom> loadMappings() {
+        try {
+            return Arrays.asList(objectMapper.readValue(resolvePath(mappingPath).toFile(), MappingRoom[].class));
+        } catch (IOException e) {
+            log.warn("Unable to read room mapping file for reservation areas: {}", e.getMessage());
+            return List.of();
         }
-        return "IFC - " + storey;
     }
 
-    private String buildDbLocation(Site site, BuildingStructure building, String floorName) {
-        return List.of(
-                        site != null ? site.getName() : null,
-                        site != null ? site.getLocation() : null,
-                        building != null && isUsefulBuildingName(building.getName()) ? building.getName() : null,
-                        floorName
-                )
-                .stream()
-                .filter(value -> !isBlank(value))
-                .distinct()
-                .collect(Collectors.joining(" - "));
-    }
-
-    private boolean hasUsefulDbLocation(String location) {
-        return !isBlank(location)
-                && !"IFC Site - Extracted from IFC".equals(location)
-                && !"IFC Site".equals(location)
-                && !"Extracted from IFC".equals(location);
-    }
-
-    private boolean isUsefulBuildingName(String value) {
-        return !isBlank(value) && !value.contains(":");
-    }
-
-    private String formatSlot(LocalDate date, LocalTime startTime, LocalTime endTime) {
-        return date + " " + startTime.format(TIME_FORMATTER) + " - " + endTime.format(TIME_FORMATTER);
-    }
-
-    private String valueOrDefault(String value, String fallback) {
-        return isBlank(value) ? fallback : value;
-    }
-
-    private String trimToNull(String value) {
-        if (isBlank(value)) {
-            return null;
-        }
-        return value.trim();
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
+    private Path resolvePath(String configuredPath) {
+        Path path = Paths.get(configuredPath);
+        return path.isAbsolute() ? path.normalize() : Paths.get(System.getProperty("user.dir"), configuredPath).normalize();
     }
 
     private String normalize(String value) {
-        return isBlank(value) ? "" : value.trim().toLowerCase();
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private String cleanStorey(String value) {
-        if (isBlank(value) || Objects.equals(value.trim(), "?")) {
-            return null;
-        }
-        return value.trim();
-    }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class MappingRoom {
+        @JsonProperty("ifc_global_id")
+        public String ifcGlobalId;
 
-    private record ReservationRoomSource(
-            String ifcGlobalId,
-            String name,
-            String longName,
-            String storey,
-            String location,
-            Double areaM2
-    ) {
-    }
+        @JsonProperty("ifc_name")
+        public String ifcName;
 
-    private record DbRoomInfo(
-            String roomName,
-            String floorName,
-            String location
-    ) {
+        @JsonProperty("area_m2")
+        public Double areaM2;
     }
 }

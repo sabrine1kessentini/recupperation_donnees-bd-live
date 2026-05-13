@@ -19,7 +19,7 @@ type DashboardViewProps = {
   onOpenRoom?: (roomName: string) => void;
 };
 
-export function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps) {
+export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(true);

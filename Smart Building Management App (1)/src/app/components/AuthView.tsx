@@ -1,16 +1,42 @@
 import { useState } from 'react';
 import { Building2, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { login } from '../../services/api';
+import { decodeJwtPayload } from '../../utils/auth';
 
 interface AuthViewProps {
   onAuthenticate: () => void;
 }
 
 export function AuthView({ onAuthenticate }: AuthViewProps) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onAuthenticate();
+    setError(null);
+    setIsLoading(true);
+    try {
+      const { token } = await login(email, password);
+      // Store token
+      localStorage.setItem('access_token', token);
+      // Extract roles from token if not provided by backend
+      let roles: string[] = [];
+      try {
+        const payload = decodeJwtPayload(token);
+        roles = (payload.roles || payload.authorities || []) as string[];
+      } catch (e) {
+        console.error('Failed to decode JWT payload', e);
+      }
+      localStorage.setItem('roles', JSON.stringify(roles));
+      onAuthenticate();
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -39,8 +65,11 @@ export function AuthView({ onAuthenticate }: AuthViewProps) {
                   <input
                     type="email"
                     required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     className="w-full bg-transparent outline-none text-zinc-700 placeholder:text-zinc-400"
+                    disabled={isLoading}
                   />
                 </div>
               </label>
@@ -52,8 +81,11 @@ export function AuthView({ onAuthenticate }: AuthViewProps) {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="********"
                     className="w-full bg-transparent outline-none text-zinc-700 placeholder:text-zinc-400"
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
@@ -65,6 +97,12 @@ export function AuthView({ onAuthenticate }: AuthViewProps) {
                   </button>
                 </div>
               </label>
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-xl border border-red-200">
+                  {error}
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-zinc-500">
@@ -78,9 +116,10 @@ export function AuthView({ onAuthenticate }: AuthViewProps) {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-[#f4b400] hover:bg-[#e2a800] text-white shadow-[0_12px_24px_rgba(244,180,0,0.35)] transition-colors"
+                disabled={isLoading}
+                className="w-full py-3 rounded-2xl bg-[#f4b400] hover:bg-[#e2a800] text-white shadow-[0_12px_24px_rgba(244,180,0,0.35)] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
           </div>

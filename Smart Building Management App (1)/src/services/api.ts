@@ -1,13 +1,21 @@
 // src/services/api.ts
+import { getToken } from '../utils/auth';
+
 // URLs for different backend services
 const SPRING_URL = import.meta.env.VITE_SPRING_URL || 'http://localhost:8084';
 const ALERT_SERVICE_URL = import.meta.env.VITE_ALERT_SERVICE_URL || 'http://localhost:8085';
 const ENERGY_ROOMS_URL = 'http://localhost:8080/api/energy/rooms';
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8080';
 
 // ─── Helpers HTTP ─────────────────────────────────────────────────────────────
 
 async function get<T>(path: string, baseUrl: string = SPRING_URL): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`);
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${baseUrl}${path}`, { headers });
   if (!res.ok) {
     let errorMsg = `API error ${res.status} on ${path}`;
     try {
@@ -24,9 +32,14 @@ async function get<T>(path: string, baseUrl: string = SPRING_URL): Promise<T> {
 }
 
 async function post<T>(path: string, body: unknown, baseUrl: string = SPRING_URL): Promise<T> {
+  const token = getToken();
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`API error ${res.status} on ${path}`);
@@ -223,17 +236,27 @@ export type AlertDto = {
 export const getAllAlerts = (): Promise<AlertDto[]> =>
   get('/api/alerts', ALERT_SERVICE_URL);
 
-export const acknowledgeAlert = (id: number): Promise<AlertDto> =>
-  fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/acknowledge`, { method: 'PUT' }).then(r => {
-    if (!r.ok) throw new Error(`API error ${r.status}`);
-    return r.json() as Promise<AlertDto>;
-  });
+export const acknowledgeAlert = async (id: number): Promise<AlertDto> => {
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/acknowledge`, { method: 'PUT', headers });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<AlertDto>;
+};
 
-export const resolveAlert = (id: number): Promise<AlertDto> =>
-  fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/resolve`, { method: 'PUT' }).then(r => {
-    if (!r.ok) throw new Error(`API error ${r.status}`);
-    return r.json() as Promise<AlertDto>;
-  });
+export const resolveAlert = async (id: number): Promise<AlertDto> => {
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${ALERT_SERVICE_URL}/api/alerts/${id}/resolve`, { method: 'PUT', headers });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<AlertDto>;
+};
 
 // ─── API Functions ────────────────────────────────────────────────────────────
 
@@ -259,8 +282,13 @@ export const getAllRealtimeData = (): Promise<SensorMeasurement[]> =>
   get('/api/measurements/recent');
 
 export const getSensorHistory = (sensorId: string, hours: number, points: number): Promise<SensorHistoryDto[]> => {
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const params = new URLSearchParams({ sensorId, hours: hours.toString(), points: points.toString() });
-  return fetch(`${SPRING_URL}/api/history?${params}`).then(r => {
+  return fetch(`${SPRING_URL}/api/history?${params}`, { headers }).then(r => {
     if (!r.ok) throw new Error(`API error ${r.status}`);
     return r.json() as Promise<SensorHistoryDto[]>;
   });
@@ -273,7 +301,12 @@ export const getWaveonSession = (): Promise<WaveonSession> =>
   get('/waveon/test-session');
 
 export const getEnergyRooms = async (): Promise<EnergyRoomApiDto[]> => {
-  const res = await fetch(ENERGY_ROOMS_URL);
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(ENERGY_ROOMS_URL, { headers });
   if (!res.ok) throw new Error(`API error ${res.status} on ${ENERGY_ROOMS_URL}`);
   return res.json() as Promise<EnergyRoomApiDto[]>;
 };
@@ -283,3 +316,28 @@ export const createReservation = (request: ReservationRequest): Promise<Reservat
 
 export const getConsumptionByUsage = (): Promise<ConsumptionByUsageDto> =>
   get('/api/measurements/consumption-by-usage');
+
+// ─── Auth API ───────────────────────────────────────────────────────────────────
+
+export interface LoginResponse {
+  token: string;
+  roles?: string[];
+}
+
+export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  const res = await fetch(`${AUTH_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: email, password }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Login failed');
+  }
+  const data = await res.json();
+  const token = data.token || data.accessToken || data.access_token;
+  if (!token) {
+    throw new Error('No token received from server');
+  }
+  return { token, roles: data.roles };
+};

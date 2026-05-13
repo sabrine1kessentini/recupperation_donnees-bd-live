@@ -5,6 +5,7 @@ import com.projet1.auth_service.dto.LoginClientRequest;
 import com.projet1.auth_service.dto.LoginClientResponse;
 import com.projet1.auth_service.security.JwtUtil;
 import com.projet1.auth_service.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -76,12 +78,21 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-        Authentication auth = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(req.username, req.password));
-        var user = (org.springframework.security.core.userdetails.User) auth.getPrincipal();
-        Set<String> roles = user.getAuthorities().stream().map(a -> a.getAuthority()).collect(Collectors.toSet());
-        String token = jwtUtil.generateToken(user.getUsername(), roles);
-        return ResponseEntity.ok(Map.of("access_token", token, "token_type", "bearer"));
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+        try {
+            String username = req.username;
+            if (userService.findByEmail(req.username).isPresent()) {
+                username = userService.findByEmail(req.username).get().getUsername();
+            }
+            Authentication auth = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, req.password));
+            var user = (org.springframework.security.core.userdetails.User) auth.getPrincipal();
+            Set<String> roles = user.getAuthorities().stream().map(a -> a.getAuthority()).collect(Collectors.toSet());
+            String token = jwtUtil.generateToken(user.getUsername(), roles);
+            return ResponseEntity.ok(Map.of("access_token", token, "token_type", "bearer", "roles", roles));
+        } catch (Exception e) {
+            logger.error("Login error for user {}: {}", req.username, e.getMessage());
+            return ResponseEntity.status(401).body(Map.of("error", "Authentication failed: " + e.getMessage()));
+        }
     }
 
     /**

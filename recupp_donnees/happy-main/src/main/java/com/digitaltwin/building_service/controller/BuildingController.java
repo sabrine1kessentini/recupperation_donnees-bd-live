@@ -144,6 +144,11 @@ public class BuildingController {
         return ResponseEntity.ok(reservationService.getReservationRooms());
     }
 
+    @PostMapping("/reservations")
+    public ResponseEntity<ReservationDto> createReservation(@RequestBody ReservationRequestDto request) {
+        return ResponseEntity.ok(reservationService.createReservation(request));
+    }
+
     @GetMapping("/equipment")
     public ResponseEntity<List<EquipmentDto>> getEquipment() {
         return ResponseEntity.ok(hierarchyService.getEquipment());

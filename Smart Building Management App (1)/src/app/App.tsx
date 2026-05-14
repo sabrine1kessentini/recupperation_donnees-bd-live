@@ -27,15 +27,12 @@ const DigitalTwinView = () => (
 );
 
 export default function App() {
-  const roles = getRoles();
-  const isOccupant = roles.includes('ROLE_OCCUPANT') && roles.length === 1;
-  const [activeView, setActiveView] = useState(() => checkAuth() ? (isOccupant ? 'digitalTwin' : 'dashboard') : 'dashboard');
+  const [activeView, setActiveView] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(() => checkAuth());
 
   const renderView = () => {
     const roles = getRoles();
     const isAdmin = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPERADMIN');
-    const isOccupant = roles.includes('ROLE_OCCUPANT');
     const DefaultDashboard = isAdmin ? DashboardView : DashboardViewOccupant;
 
     switch (activeView) {

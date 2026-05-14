@@ -4,7 +4,7 @@ import {
   Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, Droplets,
   Lightbulb, Lock, Snowflake, Square, Sun, Thermometer, Wind, Zap, RefreshCw
 } from 'lucide-react';
-import { getWaveonSession, getAllRecentMeasurements, type SensorMeasurement, type WaveonSession } from '../../services/api';
+import { getAllRealtimeData, type SensorMeasurement } from '../../services/api';
 
 type WeatherData = {
   temperature: number;
@@ -19,13 +19,14 @@ type DashboardViewProps = {
   onOpenRoom?: (roomName: string) => void;
 };
 
+const OCCUPANT_ROOM_NAME = 'B109';
+
 export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(true);
 
   // Données Spring Boot
-  const [session, setSession] = useState<WaveonSession | null>(null);
   const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -65,15 +66,11 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
      setIsDataLoading(true);
      setDataError(null);
      try {
-       const [sessionData, measureData] = await Promise.all([
-         getWaveonSession(),
-         getAllRecentMeasurements(),
-       ]);
-       setSession(sessionData);
+       const measureData = await getAllRealtimeData();
        setMeasurements(measureData);
        setLastRefresh(new Date());
      } catch (err) {
-       setDataError('Impossible de contacter le serveur Spring Boot (port 8084)');
+       setDataError('Impossible de charger les mesures temps reel depuis Spring Boot (port 8084)');
      } finally {
        setIsDataLoading(false);
      }
@@ -86,21 +83,34 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
    }, []);
 
   // Stats calculées depuis les vraies mesures
-  const tempMeasurements = measurements.filter(m => m.sensorType === 'temperature');
-  const humMeasurements = measurements.filter(m => m.sensorType === 'humidity');
-  const energyMeasurements = measurements.filter(m => m.sensorType === 'energy');
+  const roomMeasurements = useMemo(
+    () => measurements.filter(m => m.roomName === OCCUPANT_ROOM_NAME),
+    [measurements]
+  );
 
-  const avgTemp = tempMeasurements.length > 0
-    ? (tempMeasurements.reduce((s, m) => s + m.value, 0) / tempMeasurements.length).toFixed(1)
-    : '--';
-  const avgHum = humMeasurements.length > 0
-    ? Math.round(humMeasurements.reduce((s, m) => s + m.value, 0) / humMeasurements.length)
-    : '--';
-  const totalEnergy = energyMeasurements.length > 0
-    ? (energyMeasurements.reduce((s, m) => s + m.value, 0) / 1000).toFixed(0)
-    : '--';
+  const latestMeasurementsByType = useMemo(() => {
+    return roomMeasurements.reduce<Record<string, SensorMeasurement>>((latest, measurement) => {
+      const current = latest[measurement.sensorType];
+      if (!current || new Date(measurement.timestamp).getTime() > new Date(current.timestamp).getTime()) {
+        latest[measurement.sensorType] = measurement;
+      }
+      return latest;
+    }, {});
+  }, [roomMeasurements]);
 
-  const alertMeasurements = measurements.filter(m => m.status !== 'OK');
+  const tempMeasurements = roomMeasurements.filter(m => m.sensorType === 'temperature');
+  const humMeasurements = roomMeasurements.filter(m => m.sensorType === 'humidity');
+  const energyMeasurements = roomMeasurements.filter(m => m.sensorType === 'energy');
+
+  const latestTemp = latestMeasurementsByType['temperature']?.value ?? null;
+  const latestHum = latestMeasurementsByType['humidity']?.value ?? null;
+  const latestEnergy = latestMeasurementsByType['energy']?.value ?? null;
+
+   const latestTempDisplay = latestTemp !== null ? latestTemp.toFixed(1) : '--';
+   const latestHumDisplay = latestHum !== null ? Math.round(latestHum) : '--';
+   const latestEnergyDisplay = latestEnergy !== null ? (latestEnergy / 1000).toFixed(1) : '--';
+
+  const alertMeasurements = roomMeasurements.filter(m => m.status !== 'OK');
 
   // Météo icons
   const weatherIcon = useMemo(() => {
@@ -145,12 +155,10 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
     <div className="min-h-full p-5 bg-[radial-gradient(circle_at_0%_0%,#f6f7f8_0,#e9ecef_45%,#e2e8ec_100%)]">
       <header className="flex items-center justify-between rounded-3xl bg-[#d6d1cb]/65 px-6 py-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-700">Smart Building Dashboard</h1>
-          {session && (
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Session WaveOn — Mode: {session.mode} · Client #{session.idclient}
-            </p>
-          )}
+          <h1 className="text-2xl font-semibold text-zinc-700">Dashboard Occupant - Salle {OCCUPANT_ROOM_NAME}</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Donnees capteurs temps reel - {OCCUPANT_ROOM_NAME}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-72 rounded-full bg-white/70 px-4 py-2 text-sm text-zinc-500">
@@ -182,6 +190,13 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
         <div className="mb-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           {dataError} — Vérifiez que <code className="bg-red-100 px-1 rounded">mvn spring-boot:run</code> tourne sur le port 8084.
+        </div>
+      )}
+
+      {!isDataLoading && !dataError && roomMeasurements.length === 0 && (
+        <div className="mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          Aucune mesure temps reel trouvee pour la salle {OCCUPANT_ROOM_NAME}.
         </div>
       )}
 
@@ -220,17 +235,16 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
         <article className="col-span-3 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700">
             <Droplets className="w-4 h-4 text-[#5f84ff]" />
-            <h3 className="font-semibold">Humidity (capteurs)</h3>
+            <h3 className="font-semibold">Humidite B109</h3>
           </div>
-          <div className="mt-8 flex items-center gap-4">
-            <div className="size-16 rounded-full border-[7px] border-[#7f97f9] border-r-[#e8ecff]" />
-            <div>
-              <p className="text-4xl text-zinc-700 font-semibold">
-                {isDataLoading ? '...' : `${avgHum}%`}
-              </p>
-              <p className="text-xs text-zinc-500 mt-1">{humMeasurements.length} capteurs</p>
-            </div>
-          </div>
+           <div className="mt-8 flex items-center gap-4">
+             <div className="size-16 rounded-full border-[7px] border-[#7f97f9] border-r-[#e8ecff]" />
+             <div>
+            <p className="text-4xl text-zinc-700 font-semibold">
+              {isDataLoading ? '...' : `${latestHumDisplay}%`}
+            </p>
+             </div>
+           </div>
         </article>
 
         {/* Prochaine réunion */}
@@ -265,35 +279,21 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">
             <Thermometer className="w-4 h-4 text-orange-400" />
-            <h3 className="font-semibold">Température moyenne</h3>
+            <h3 className="font-semibold">Temperature B109</h3>
           </div>
           <p className="text-4xl font-bold text-zinc-800">
-            {isDataLoading ? '...' : `${avgTemp}°C`}
+            {isDataLoading ? '...' : `${latestTempDisplay}°C`}
           </p>
-          <p className="text-xs text-zinc-500 mt-1">{tempMeasurements.length} capteurs actifs</p>
-          {tempMeasurements.slice(0, 3).map(m => (
-            <div key={m.sensorId} className="mt-2 text-xs text-zinc-600 flex justify-between">
-              <span>{m.roomName}</span>
-              <span className="font-medium">{m.value}°C</span>
-            </div>
-          ))}
         </article>
 
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">
             <Zap className="w-4 h-4 text-amber-500" />
-            <h3 className="font-semibold">Énergie totale</h3>
+            <h3 className="font-semibold">Energie B109</h3>
           </div>
-          <p className="text-4xl font-bold text-zinc-800">
-            {isDataLoading ? '...' : `${totalEnergy} MWh`}
-          </p>
-          <p className="text-xs text-zinc-500 mt-1">{energyMeasurements.length} compteurs</p>
-          {energyMeasurements.slice(0, 3).map(m => (
-            <div key={m.sensorId} className="mt-2 text-xs text-zinc-600 flex justify-between">
-              <span>{m.roomName}</span>
-              <span className="font-medium">{(m.value / 1000).toFixed(0)} kWh</span>
-            </div>
-          ))}
+           <p className="text-4xl font-bold text-zinc-800">
+             {isDataLoading ? '...' : `${latestEnergyDisplay} kWh`}
+           </p>
         </article>
 
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
@@ -304,7 +304,7 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
           <p className="text-4xl font-bold text-zinc-800">
             {isDataLoading ? '...' : alertMeasurements.length}
           </p>
-          <p className="text-xs text-zinc-500 mt-1">capteurs hors seuil</p>
+          <p className="text-xs text-zinc-500 mt-1">capteurs hors seuil dans B109</p>
           {alertMeasurements.slice(0, 3).map(m => (
             <div key={m.sensorId} className="mt-2 text-xs text-red-600 flex justify-between">
               <span>{m.roomName}</span>
@@ -319,7 +319,7 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
             Mode automatique activé pour votre confort — ajustez librement si besoin
           </p>
           <p className="text-xs text-zinc-400">
-            Dernière synchro : {lastRefresh.toLocaleTimeString('fr-FR')} · {measurements.length} mesures chargées
+            Derniere synchro : {lastRefresh.toLocaleTimeString('fr-FR')} - {roomMeasurements.length} mesures B109 chargees
           </p>
         </article>
 
@@ -356,12 +356,12 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
         </article>
         <article className="col-span-2 rounded-3xl bg-[#efe7d4] p-4">
           <h4 className="font-semibold text-zinc-700">Thermostat</h4>
-          <div className="mt-4 flex items-center justify-between">
-            <Thermometer className="w-10 h-10 text-zinc-500" />
-            <span className="px-3 py-1 rounded-full bg-white/80 text-zinc-700 text-xs font-bold">
-              {isDataLoading ? '--' : `${avgTemp}°`}
-            </span>
-          </div>
+           <div className="mt-4 flex items-center justify-between">
+             <Thermometer className="w-10 h-10 text-zinc-500" />
+             <span className="px-3 py-1 rounded-full bg-white/80 text-zinc-700 text-xs font-bold">
+               {isDataLoading ? '--' : `${latestTempDisplay}°`}
+             </span>
+           </div>
         </article>
 
         {/* Smart Lighting */}
@@ -385,7 +385,7 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-semibold text-zinc-700">Thermostat</h3>
             <span className="text-3xl font-semibold text-zinc-700">
-              {isDataLoading ? '--' : avgTemp}
+              {isDataLoading ? '--' : `${latestTempDisplay}°`}
             </span>
           </div>
           <div className="mx-auto size-40 rounded-full border-[12px] border-[#f4b400] border-l-[#e6eaee] border-b-[#e6eaee] grid place-items-center">

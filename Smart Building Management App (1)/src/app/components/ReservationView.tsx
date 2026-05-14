@@ -4,6 +4,17 @@ import { createReservation, getReservationRooms, type ReservationRoomDto } from 
 
 const ALLOWED_ROOMS = new Set(['B109', 'B152', 'B135', 'B119', 'B111', 'B123', 'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139']);
 
+const ROOM_DISPLAY_NAMES: Record<string, string> = {
+  B125: 'CONFERENCE ROOM 1',
+  B129: 'CONFERENCE ROOM 2',
+  B150: 'MEETING ROOM 1',
+  B152: 'MEETING ROOM 2',
+  B111:'CONFERENCE ROOM 5',
+  B123: 'MEETING ROOM 3',
+  B148: 'CONFERENCE ROOM 6',
+  B119: 'MEETING ROOM 4'
+};
+
 type RoomStatus = 'available' | 'reserved';
 
 type MeetingRoom = {
@@ -22,7 +33,7 @@ type MeetingRoom = {
 const toRoom = (room: ReservationRoomDto): MeetingRoom => ({
   id: room.ifcGlobalId,
   name: room.name,
-  displayName: room.longName || room.name,
+  displayName: ROOM_DISPLAY_NAMES[room.name] || room.longName || room.name,
   code: room.name,
   floor: room.storey || 'Etage non renseigne',
   location: room.location || 'IFC',

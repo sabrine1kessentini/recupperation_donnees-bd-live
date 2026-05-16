@@ -4,7 +4,7 @@ import {
   Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, Droplets,
   Lightbulb, Lock, Snowflake, Square, Sun, Thermometer, Wind, Zap, RefreshCw
 } from 'lucide-react';
-import { getAllRealtimeData, type SensorMeasurement } from '../../services/api';
+import { getAllRealtimeData, getReservationRooms, type SensorMeasurement, type ReservationRoomDto, type ReservationDto } from '../../services/api';
 
 type WeatherData = {
   temperature: number;
@@ -31,6 +31,11 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  // Réservations
+  const [nextReservation, setNextReservation] = useState<ReservationDto | null>(null);
+  const [isReservationLoading, setIsReservationLoading] = useState(true);
+  const [reservationError, setReservationError] = useState<string | null>(null);
 
 // Fetch météo (Node.js backend)
    useEffect(() => {
@@ -81,6 +86,52 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
      const id = window.setInterval(fetchSensorData, 5000);
      return () => window.clearInterval(id);
    }, []);
+
+  // Fetch réservations B109
+  const fetchReservations = async () => {
+    setIsReservationLoading(true);
+    setReservationError(null);
+    try {
+      const rooms = await getReservationRooms();
+      const b109Room = rooms.find(r => r.name === OCCUPANT_ROOM_NAME);
+      
+      if (b109Room) {
+        // Combiner toutes les réservations (courante + liste)
+        const allReservations = [];
+        if (b109Room.currentReservation) {
+          allReservations.push(b109Room.currentReservation);
+        }
+        if (b109Room.reservations && b109Room.reservations.length > 0) {
+          allReservations.push(...b109Room.reservations);
+        }
+        
+        // Filtrer uniquement les réservations futures de B109
+        const now = new Date();
+        const futureReservations = allReservations.filter(r => {
+          const resDate = new Date(`${r.date}T${r.startTime}`);
+          return resDate > now && r.roomName === OCCUPANT_ROOM_NAME;
+        }).sort((a, b) => {
+          const dateA = new Date(`${a.date}T${a.startTime}`);
+          const dateB = new Date(`${b.date}T${b.startTime}`);
+          return dateA.getTime() - dateB.getTime();
+        });
+        
+        setNextReservation(futureReservations.length > 0 ? futureReservations[0] : null);
+      } else {
+        setNextReservation(null);
+      }
+    } catch (err) {
+      setReservationError('Impossible de charger les réservations');
+    } finally {
+      setIsReservationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReservations();
+    const id = window.setInterval(fetchReservations, 30000); // Refresh toutes les 30 secondes
+    return () => window.clearInterval(id);
+  }, []);
 
   // Stats calculées depuis les vraies mesures
   const roomMeasurements = useMemo(
@@ -253,73 +304,53 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
             <CalendarClock className="w-5 h-5 text-[#f4b400]" />
             <h3 className="font-semibold">Prochaine reunion</h3>
           </div>
-          <div className="mt-4 rounded-2xl bg-[#efe7d4] px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-zinc-500">Date</p>
-              <p className="text-lg font-semibold text-zinc-700">12 Avril 2026</p>
+          {reservationError && (
+            <div className="mt-4 p-3 rounded-2xl bg-red-50 border border-red-200 text-red-600 text-xs">
+              {reservationError}
             </div>
-            <div className="w-px h-10 bg-zinc-300/70" />
-            <div>
-              <p className="text-sm text-zinc-500">Heure</p>
-              <p className="text-lg font-semibold text-zinc-700">10:30</p>
+          )}
+          {isReservationLoading ? (
+            <div className="mt-4 rounded-2xl bg-[#efe7d4] px-4 py-3 text-center text-zinc-500">
+              Chargement...
             </div>
-            <button
-              onClick={() => onOpenRoom?.('B109')}
-              className="px-3 py-2 rounded-xl bg-[#f4b400] text-white text-sm"
-            >
-              Tester B109
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-zinc-500">
-            Ce bouton ouvre la page de test de la salle B109 avec ses donnees capteurs.
-          </p>
+          ) : nextReservation ? (
+            <div className="mt-4 rounded-2xl bg-[#efe7d4] px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-zinc-500">Date</p>
+                <p className="text-lg font-semibold text-zinc-700">
+                  {new Date(`${nextReservation.date}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+              <div className="w-px h-10 bg-zinc-300/70" />
+              <div>
+                <p className="text-sm text-zinc-500">Horaire</p>
+                <p className="text-lg font-semibold text-zinc-700">
+                  {nextReservation.startTime.substring(0, 5)} - {nextReservation.endTime.substring(0, 5)}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-[#efe7d4] px-4 py-3 text-center text-zinc-600">
+              Aucune reservation prevue
+            </div>
+          )}
         </article>
 
         {/* KPIs capteurs réels */}
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">
             <Thermometer className="w-4 h-4 text-orange-400" />
-            <h3 className="font-semibold">Temperature B109</h3>
+            <h3 className="font-semibold">Temperature</h3>
           </div>
           <p className="text-4xl font-bold text-zinc-800">
             {isDataLoading ? '...' : `${latestTempDisplay}°C`}
           </p>
         </article>
 
-        <article className="col-span-4 rounded-3xl bg-white/75 p-5">
-          <div className="flex items-center gap-2 text-zinc-700 mb-3">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <h3 className="font-semibold">Energie B109</h3>
-          </div>
-           <p className="text-4xl font-bold text-zinc-800">
-             {isDataLoading ? '...' : `${latestEnergyDisplay} kWh`}
-           </p>
-        </article>
-
-        <article className="col-span-4 rounded-3xl bg-white/75 p-5">
-          <div className="flex items-center gap-2 text-zinc-700 mb-3">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <h3 className="font-semibold">Alertes capteurs</h3>
-          </div>
-          <p className="text-4xl font-bold text-zinc-800">
-            {isDataLoading ? '...' : alertMeasurements.length}
-          </p>
-          <p className="text-xs text-zinc-500 mt-1">capteurs hors seuil dans B109</p>
-          {alertMeasurements.slice(0, 3).map(m => (
-            <div key={m.sensorId} className="mt-2 text-xs text-red-600 flex justify-between">
-              <span>{m.roomName}</span>
-              <span className="font-medium">{m.status}</span>
-            </div>
-          ))}
-        </article>
-
         {/* Bannière info */}
         <article className="col-span-12 rounded-2xl bg-white/80 border border-white/90 px-5 py-3 shadow-sm flex items-center justify-between">
           <p className="text-[13px] md:text-sm font-medium tracking-[0.01em] text-zinc-600">
             Mode automatique activé pour votre confort — ajustez librement si besoin
-          </p>
-          <p className="text-xs text-zinc-400">
-            Derniere synchro : {lastRefresh.toLocaleTimeString('fr-FR')} - {roomMeasurements.length} mesures B109 chargees
           </p>
         </article>
 
@@ -391,9 +422,6 @@ export default function DashboardViewOccupant({ onOpenRoom }: DashboardViewProps
           <div className="mx-auto size-40 rounded-full border-[12px] border-[#f4b400] border-l-[#e6eaee] border-b-[#e6eaee] grid place-items-center">
             <Thermometer className="w-9 h-9 text-zinc-500" />
           </div>
-          <p className="mt-6 text-zinc-600">
-            {isDataLoading ? '...' : `${tempMeasurements.length} capteurs`}
-          </p>
         </article>
 
         {/* Signaler un problème */}

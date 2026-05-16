@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Ruler } from 'lucide-react';
-import { createReservation, getReservationRooms, type ReservationRoomDto } from '../../services/api';
+import { createReservation, getReservationRooms, type ReservationDto, type ReservationRoomDto } from '../../services/api';
 
 const ALLOWED_ROOMS = new Set(['B109', 'B152', 'B135', 'B119', 'B111', 'B123', 'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139']);
 
@@ -64,6 +64,39 @@ const overlapsReservation = (room: MeetingRoom, date: string, startTime: string,
 const formatDate = (value: string) => {
   const [year, month, day] = value.split('-');
   return day && month && year ? `${day}/${month}/${year}` : value;
+};
+
+type ReservationNotification = {
+  id: string;
+  roomName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reservedBy: string | null;
+  email: string | null;
+  phone: string | null;
+  createdAt: string;
+  read: boolean;
+};
+
+const RESERVATION_NOTIFICATION_STORAGE_KEY = 'directionReservationNotifications';
+
+const pushDirectionReservationNotification = (notification: ReservationNotification) => {
+  try {
+    const existing = localStorage.getItem(RESERVATION_NOTIFICATION_STORAGE_KEY);
+    const list: ReservationNotification[] = existing ? JSON.parse(existing) : [];
+    const next = [notification, ...list].slice(0, 5);
+    localStorage.setItem(RESERVATION_NOTIFICATION_STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('directionReservationNotification'));
+  } catch (error) {
+    // Ignore storage errors
+  }
+};
+
+const isReservationActive = (reservation: ReservationDto) => {
+  const now = new Date();
+  const reservationEnd = new Date(`${reservation.date}T${reservation.endTime}`);
+  return reservationEnd.getTime() > now.getTime();
 };
 
 export function ReservationView() {
@@ -161,7 +194,7 @@ export function ReservationView() {
 
     setIsSaving(true);
     try {
-      await createReservation({
+      const reservation = await createReservation({
         ifcGlobalId: selectedRoom.id,
         firstName,
         lastName,
@@ -172,6 +205,21 @@ export function ReservationView() {
         startTime,
         endTime,
       });
+
+      const reservedByName = reservation.reservedBy || `${firstName} ${lastName}`.trim() || null;
+      pushDirectionReservationNotification({
+        id: `${reservation.id}-${Date.now()}`,
+        roomName: selectedRoom.displayName,
+        date,
+        startTime,
+        endTime,
+        reservedBy: reservedByName,
+        email: email || null,
+        phone: phone || null,
+        createdAt: new Date().toISOString(),
+        read: false,
+      });
+
       await loadRooms();
       setMessage(`Reservation confirmee pour ${selectedRoom.displayName} le ${date} de ${startTime} a ${endTime}.`);
     } catch (error) {
@@ -256,11 +304,11 @@ export function ReservationView() {
                   </button>
                 </div>
 
-                {room.reservations.length > 0 && (
+                {room.reservations.filter(isReservationActive).length > 0 && (
                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <p className="text-xs font-medium text-slate-600">Reservations</p>
                     <div className="mt-2 space-y-2">
-                      {room.reservations.slice(0, 3).map((reservation) => (
+                      {room.reservations.filter(isReservationActive).slice(0, 3).map((reservation) => (
                         <div key={reservation.id} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
                           <p className="font-medium text-slate-900">{formatDate(reservation.date)}</p>
                           <p className="mt-1">Debut: {reservation.startTime} - Fin: {reservation.endTime}</p>

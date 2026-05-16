@@ -32,8 +32,18 @@ export default function App() {
 
   const renderView = () => {
     const roles = getRoles();
+    const isDirection = roles.includes('ROLE_DIRECTION');
+    const isOccupant = roles.includes('ROLE_OCCUPANT');
     const isAdmin = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPERADMIN');
-    const DefaultDashboard = isAdmin ? DashboardView : DashboardViewOccupant;
+    
+    let DefaultDashboard = DashboardViewOccupant;
+    if (isDirection) {
+      DefaultDashboard = DashboardView;
+    } else if (isOccupant) {
+      DefaultDashboard = DashboardViewOccupant;
+    } else if (isAdmin) {
+      DefaultDashboard = DashboardView;
+    }
 
     switch (activeView) {
       case 'dashboard':

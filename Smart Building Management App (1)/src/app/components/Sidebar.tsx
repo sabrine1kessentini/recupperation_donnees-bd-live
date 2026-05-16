@@ -43,7 +43,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 'analytics',   icon: BarChart3,       label: 'Analytics',   allowedRoles: [] },
 ];
 
-const OCCUPANT_ONLY_ITEMS = ['dashboard', 'digitalTwin', 'reservation'];
+const OCCUPANT_ONLY_ITEMS = ['dashboard', 'reservation'];
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const roles = getRoles();

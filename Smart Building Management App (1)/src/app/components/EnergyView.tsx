@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { Zap, TrendingDown, TrendingUp, Battery, Sun, Sparkles, Lightbulb, RefreshCw, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getAllRecentMeasurements, getAllRealtimeData, getEnergyComparison, getEnergyConsumptionByRoom, getActiveRoomsCount, getActiveSensorsCount, getConsumptionByUsage, type SensorMeasurement, type EnergyComparisonDto, type RoomEnergyConsumptionDto, type ConsumptionByUsageDto } from '../../services/api';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 export function EnergyView() {
    const [measurements, setMeasurements] = useState<SensorMeasurement[]>([]);
@@ -40,48 +42,39 @@ export function EnergyView() {
    const startRealtimeUpdates = () => {
      if (stompClient.current?.connected) return;
 
-     import('@stomp/stompjs').then(({ Client }) => {
-       import('sockjs-client').then(({ default: SockJS }) => {
-         stompClient.current = new Client({
-           webSocketFactory: () => {
-             return new SockJS(`${WS_URL}/ws`);
-           },
-           debug: (str: string) => {
-             console.log('STOMP:', str);
-           },
-           onConnect: () => {
-             setIsRealtime(true);
-             setError(null);
-             stompClient.current.subscribe('/topic/sensor-data', (message: any) => {
-               try {
-                 const data = JSON.parse(message.body);
-                 updateMeasurements([data]);
-                 setLastUpdate(new Date());
-               } catch (e) {
-                 console.error('Failed to parse STOMP message:', e);
-               }
-             });
-           },
-           onStompError: (frame: any) => {
-             console.error('STOMP error:', frame);
-             setError('Erreur de connexion au service temps réel');
-           },
-           onWebSocketError: (err: any) => {
-             console.error('WebSocket error:', err);
-             setError('Erreur de connexion temps réel');
-           },
-           reconnectDelay: 5000,
-           heartbeatIncoming: 4000,
-           heartbeatOutgoing: 4000,
+     stompClient.current = new Client({
+       webSocketFactory: () => {
+         return new SockJS(`${WS_URL}/ws`);
+       },
+       debug: (str: string) => {
+         console.log('STOMP:', str);
+       },
+       onConnect: () => {
+         setIsRealtime(true);
+         setError(null);
+         stompClient.current.subscribe('/topic/sensor-data', (message: any) => {
+           try {
+             const data = JSON.parse(message.body);
+             updateMeasurements([data]);
+             setLastUpdate(new Date());
+           } catch (e) {
+             console.error('Failed to parse STOMP message:', e);
+           }
          });
-         stompClient.current.activate();
-       }).catch((err) => {
-         console.error('Failed to load SockJS client:', err);
-       });
-     }).catch((err) => {
-       console.error('Failed to load STOMP client:', err);
-       startPolling();
+       },
+       onStompError: (frame: any) => {
+         console.error('STOMP error:', frame);
+         setError('Erreur de connexion au service temps réel');
+       },
+       onWebSocketError: (err: any) => {
+         console.error('WebSocket error:', err);
+         setError('Erreur de connexion temps réel');
+       },
+       reconnectDelay: 5000,
+       heartbeatIncoming: 4000,
+       heartbeatOutgoing: 4000,
      });
+     stompClient.current.activate();
    };
 
     const startPolling = () => {

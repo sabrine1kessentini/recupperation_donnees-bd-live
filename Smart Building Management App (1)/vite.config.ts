@@ -11,15 +11,31 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    alias: {
+    alias: [
       // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
-    },
+      {
+        find: '@',
+        replacement: path.resolve(__dirname, './src'),
+      },
+      // Force all imports of three and web-ifc to use the single root version
+      {
+        find: 'three',
+        replacement: path.resolve(__dirname, './node_modules/three'),
+      },
+      {
+        find: 'web-ifc',
+        replacement: path.resolve(__dirname, './node_modules/web-ifc'),
+      },
+      {
+        find: 'three-shims/BufferGeometryUtils',
+        replacement: path.resolve(__dirname, './src/three-shims/BufferGeometryUtils.js'),
+      },
+    ],
   },
   define: {
   global: "window",
 },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  assetsInclude: ['**/*.svg', '**/*.csv'],
+  assetsInclude: ['**/*.svg', '**/*.csv', '**/*.wasm'],
 })

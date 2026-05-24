@@ -6,6 +6,7 @@ const SPRING_URL = import.meta.env.VITE_SPRING_URL || 'http://localhost:8084';
 const ALERT_SERVICE_URL = import.meta.env.VITE_ALERT_SERVICE_URL || 'http://localhost:8085';
 const ENERGY_ROOMS_URL = 'http://localhost:8080/api/energy/rooms';
 const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8080';
+const PRICING_API_URL = 'http://localhost:8085';
 
 // ─── Helpers HTTP ─────────────────────────────────────────────────────────────
 
@@ -44,6 +45,53 @@ async function post<T>(path: string, body: unknown, baseUrl: string = SPRING_URL
   });
   if (!res.ok) throw new Error(`API error ${res.status} on ${path}`);
   return res.json() as Promise<T>;
+}
+export type PricingEstimateDto = {
+  room_name: string;
+  start_datetime: string;
+  end_datetime: string;
+  duration_hours: number;
+  predicted_kwh: number;
+  rental_cost_dt: number;
+  energy_cost_dt: number;
+  total_price_dt: number;
+  available: boolean;
+  conflicts: number;
+};
+
+export async function estimateReservationPrice(
+  payload: {
+    roomName: string;
+    startDatetime: string;
+    endDatetime: string;
+  },
+  signal?: AbortSignal
+): Promise<PricingEstimateDto> {
+  const token = getToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${PRICING_API_URL}/api/pricing/estimate`, {
+    method: 'POST',
+    headers,
+    signal,
+    body: JSON.stringify({
+      room_name: payload.roomName,
+      start_datetime: payload.startDatetime,
+      end_datetime: payload.endDatetime,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json();
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

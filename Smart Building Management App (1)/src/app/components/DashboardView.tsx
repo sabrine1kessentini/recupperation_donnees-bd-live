@@ -477,18 +477,28 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
           {energyError && <p className="text-xs text-red-600 mt-2">{energyError}</p>}
         </article>
         {/* KPIs capteurs réels */}
-        <article className="col-span-4 rounded-3xl bg-white/75 p-5">
-          <div className="flex items-center gap-2 text-zinc-700 mb-3">
-            <Thermometer className="w-4 h-4 text-orange-400" />
-            <h3 className="font-semibold">Cout Energetique (semaine)</h3>
-          </div>
-          <p className="text-4xl font-bold text-zinc-800">
-            {isEnergyLoading ? '...' : energyComparison ? `${(parseFloat(totalEnergy as string) * 180).toFixed(0)} DT` : '--'}
-          </p>
-          {energyComparison && (
-            <p className="text-xs text-zinc-500 mt-1">Basé sur {totalEnergy} MWh @ 180 DT/MWh</p>
-          )}
-        </article>
+<article className="col-span-4 rounded-3xl bg-white/75 p-5">
+  <div className="flex items-center gap-2 text-zinc-700 mb-3">
+    <Thermometer className="w-4 h-4 text-orange-400" />
+    <h3 className="font-semibold">Cout Energetique (semaine)</h3>
+  </div>
+
+  <p className="text-4xl font-bold text-zinc-800">
+    {isEnergyLoading
+      ? '...'
+      : energyComparison
+      ? `${(
+          parseFloat(totalEnergy as string) * 0.18
+        ).toFixed(0)} DT`
+      : '--'}
+  </p>
+
+  {energyComparison && (
+    <p className="text-xs text-zinc-500 mt-1">
+      Basé sur {totalEnergy} kWh @ 0.18 DT/kWh
+    </p>
+  )}
+</article>
 
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">

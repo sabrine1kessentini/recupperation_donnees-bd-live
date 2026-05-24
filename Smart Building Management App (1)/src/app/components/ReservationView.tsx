@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Ruler } from 'lucide-react';
-import { createReservation, getReservationRooms, type ReservationDto, type ReservationRoomDto } from '../../services/api';
+import { createReservation, estimateReservationPrice, getReservationRooms, type PricingEstimateDto, type ReservationDto, type ReservationRoomDto } from '../../services/api';
+import { RoomPreviewIFC } from './RoomPreviewIFC';
 
 const ALLOWED_ROOMS = new Set(['B109', 'B152', 'B135', 'B119', 'B111', 'B123', 'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139']);
 
@@ -9,10 +10,10 @@ const ROOM_DISPLAY_NAMES: Record<string, string> = {
   B129: 'CONFERENCE ROOM 2',
   B150: 'MEETING ROOM 1',
   B152: 'MEETING ROOM 2',
-  B111:'CONFERENCE ROOM 5',
+  B111: 'CONFERENCE ROOM 5',
   B123: 'MEETING ROOM 3',
   B148: 'CONFERENCE ROOM 6',
-  B119: 'MEETING ROOM 4'
+  B119: 'MEETING ROOM 4',
 };
 
 type RoomStatus = 'available' | 'reserved';
@@ -50,10 +51,7 @@ const timeToMinutes = (time: string) => {
 
 const getOverlappingReservation = (room: MeetingRoom, date: string, startTime: string, endTime: string) =>
   room.reservations.find((reservation) => {
-    if (reservation.date !== date) {
-      return false;
-    }
-
+    if (reservation.date !== date) return false;
     return timeToMinutes(startTime) < timeToMinutes(reservation.endTime)
       && timeToMinutes(endTime) > timeToMinutes(reservation.startTime);
   });
@@ -88,7 +86,7 @@ const pushDirectionReservationNotification = (notification: ReservationNotificat
     const next = [notification, ...list].slice(0, 5);
     localStorage.setItem(RESERVATION_NOTIFICATION_STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new Event('directionReservationNotification'));
-  } catch (error) {
+  } catch {
     // Ignore storage errors
   }
 };
@@ -113,6 +111,12 @@ export function ReservationView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pricingEstimate, setPricingEstimate] = useState<PricingEstimateDto | null>(null);
+  const [isPricingLoading, setIsPricingLoading] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
+
+  // Use a ref to track the latest request so stale responses are ignored
+  const latestPricingRequestRef = useRef<number>(0);
 
   const countryPrefixes: Record<string, string> = {
     Tunisie: '+216',
@@ -132,13 +136,15 @@ export function ReservationView() {
         .map(toRoom);
 
       setRooms(filtered);
-      setMessage(filtered.length === 0
-        ? 'Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne et que la base de donnees "buildingdb" contient les zones.'
-        : null);
+      setMessage(
+        filtered.length === 0
+          ? 'Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne.'
+          : null
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Impossible de charger les salles IFC.';
       if (msg.includes('500')) {
-        setMessage('Erreur serveur (500). Verifiez les logs du building-service - fichier IFC introuvable ou base de donnees non initialisee.');
+        setMessage('Erreur serveur (500). Verifiez les logs du building-service.');
       } else if (msg.includes('404') || msg.includes('Failed to fetch')) {
         setMessage('Building-service inaccessible. Verifiez que le backend est demarre sur le port 8084.');
       } else {
@@ -158,6 +164,53 @@ export function ReservationView() {
     [rooms, selectedRoomId]
   );
 
+  useEffect(() => {
+    // Reset pricing state whenever inputs change
+    setPricingEstimate(null);
+    setPricingError(null);
+
+    if (!selectedRoom || !date || !startTime || !endTime || startTime >= endTime) {
+      setIsPricingLoading(false);
+      return;
+    }
+
+    // Increment request counter — used to ignore stale responses
+    const requestId = ++latestPricingRequestRef.current;
+
+    setIsPricingLoading(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const estimate = await estimateReservationPrice({
+          roomName: selectedRoom.code,
+          startDatetime: `${date}T${startTime}`,
+          endDatetime: `${date}T${endTime}`,
+        });
+
+        // Only update state if this is still the latest request
+        if (requestId === latestPricingRequestRef.current) {
+          setPricingEstimate(estimate);
+          setPricingError(null);
+        }
+      } catch (error) {
+        if (requestId === latestPricingRequestRef.current) {
+          setPricingError('Prix indisponible pour ce creneau.');
+          setPricingEstimate(null);
+        }
+      } finally {
+        if (requestId === latestPricingRequestRef.current) {
+          setIsPricingLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      // Do NOT abort here — let any in-flight request finish,
+      // the requestId check above will discard stale results.
+    };
+  }, [selectedRoom, date, startTime, endTime]);
+
   const getStatusUi = (isReservedForSelectedSlot: boolean) => {
     if (!isReservedForSelectedSlot) {
       return {
@@ -166,7 +219,6 @@ export function ReservationView() {
         icon: <CheckCircle2 className="h-4 w-4" />,
       };
     }
-
     return {
       label: 'Reservee',
       classes: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -175,19 +227,14 @@ export function ReservationView() {
   };
 
   const handleReserve = async () => {
-    if (!selectedRoom) {
-      setMessage('Selectionnez une salle.');
-      return;
-    }
-    if (!date || !startTime || !endTime) {
-      setMessage('Choisissez la date et les heures de debut/fin.');
-      return;
-    }
-    if (startTime >= endTime) {
-      setMessage('L heure de fin doit etre apres l heure de debut.');
-      return;
-    }
+    if (!selectedRoom) { setMessage('Selectionnez une salle.'); return; }
+    if (!date || !startTime || !endTime) { setMessage('Choisissez la date et les heures de debut/fin.'); return; }
+    if (startTime >= endTime) { setMessage("L'heure de fin doit etre apres l'heure de debut."); return; }
     if (overlapsReservation(selectedRoom, date, startTime, endTime)) {
+      setMessage('Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.');
+      return;
+    }
+    if (pricingEstimate && !pricingEstimate.available) {
       setMessage('Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.');
       return;
     }
@@ -244,13 +291,11 @@ export function ReservationView() {
               Chargement des salles IFC...
             </div>
           )}
-
           {!isLoading && rooms.length === 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
               Aucune salle IFC trouvee.
             </div>
           )}
-
           {rooms.map((room) => {
             const overlappingReservation = date && startTime && endTime
               ? getOverlappingReservation(room, date, startTime, endTime)
@@ -271,7 +316,6 @@ export function ReservationView() {
                     <p className="text-sm text-slate-600 mt-1">{room.code} - {room.floor}</p>
                     <p className="text-xs text-slate-500 mt-1">{room.location}</p>
                   </div>
-
                   <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusUi.classes}`}>
                     {statusUi.icon}
                     {statusUi.label}
@@ -323,130 +367,180 @@ export function ReservationView() {
           })}
         </div>
 
-        <div className="h-fit sticky top-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-slate-950">
-            <CalendarClock className="h-5 w-5 text-[#f4b400]" />
-            <h3 className="font-semibold">Nouvelle reservation</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs text-slate-600">Salle choisie</label>
-              <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                {selectedRoom ? `${selectedRoom.displayName} (${selectedRoom.code})` : 'Aucune salle selectionnee'}
+        <div className="h-fit sticky top-6 space-y-4">
+          {selectedRoom && (
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-slate-50">
+                <h3 className="font-semibold text-slate-950 text-sm">Apercu 3D - {selectedRoom.displayName}</h3>
+              </div>
+              <div className="w-full h-80">
+                <RoomPreviewIFC roomName={selectedRoom.code} />
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2 text-slate-950">
+              <CalendarClock className="h-5 w-5 text-[#f4b400]" />
+              <h3 className="font-semibold">Nouvelle reservation</h3>
+            </div>
+
+            <div className="space-y-4">
               <div>
-                <label className="text-xs text-slate-600">Nom</label>
+                <label className="text-xs text-slate-600">Salle choisie</label>
+                <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                  {selectedRoom ? `${selectedRoom.displayName} (${selectedRoom.code})` : 'Aucune salle selectionnee'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600">Nom</label>
+                  <input
+                    type="text"
+                    placeholder="Entrer votre nom"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600">Prenom</label>
+                  <input
+                    type="text"
+                    placeholder="Entrer votre prenom"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-600">Email</label>
                 <input
-                  type="text"
-                  placeholder="Entrer votre nom"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="exemple@domaine.com"
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-600">Prenom</label>
+                <label className="text-xs text-slate-600">Pays</label>
+                <select
+                  value={country}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    setCountry(selected);
+                    setPhone(countryPrefixes[selected] || '');
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                >
+                  <option value="Tunisie">Tunisie</option>
+                  <option value="France">France</option>
+                  <option value="Maroc">Maroc</option>
+                  <option value="Algerie">Algerie</option>
+                  <option value="USA">USA</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-600">Numero de telephone</label>
                 <input
-                  type="text"
-                  placeholder="Entrer votre prenom"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={`${countryPrefixes[country]} XX XXX XXX`}
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="text-xs text-slate-600">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="exemple@domaine.com"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-              />
-            </div>
+              <div>
+                <label className="text-xs text-slate-600">Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                />
+              </div>
 
-            <div>
-              <label className="text-xs text-slate-600">Pays</label>
-              <select
-                value={country}
-                onChange={(e) => {
-                  const selected = e.target.value;
-                  setCountry(selected);
-                  setPhone(countryPrefixes[selected] || '');
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600">Debut</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600">Fin</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
+                  />
+                </div>
+              </div>
+
+              {selectedRoom && date && startTime && endTime && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                  {isPricingLoading && (
+                    <p className="text-slate-600">Calcul du prix...</p>
+                  )}
+                  {!isPricingLoading && pricingError && (
+                    <p className="text-amber-700">{pricingError}</p>
+                  )}
+                  {!isPricingLoading && pricingEstimate && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Duree</span>
+                        <span className="font-medium">{pricingEstimate.duration_hours} h</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Consommation predite</span>
+                        <span className="font-medium">{pricingEstimate.predicted_kwh} kWh</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Location</span>
+                        <span className="font-medium">{pricingEstimate.rental_cost_dt} DT</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Energie</span>
+                        <span className="font-medium">{pricingEstimate.energy_cost_dt} DT</span>
+                      </div>
+                      <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-base">
+                        <span className="font-semibold text-slate-950">Prix estime</span>
+                        <span className="font-bold text-[#f4b400]">{pricingEstimate.total_price_dt} DT</span>
+                      </div>
+                      {!pricingEstimate.available && (
+                        <p className="text-xs text-amber-700">Ce creneau est deja reserve.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={handleReserve}
+                disabled={isSaving}
+                className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
               >
-                <option value="Tunisie">Tunisie</option>
-                <option value="France">France</option>
-                <option value="Maroc">Maroc</option>
-                <option value="Algerie">Algerie</option>
-                <option value="USA">USA</option>
-              </select>
+                {isSaving ? 'Reservation...' : 'Confirmer reservation'}
+              </button>
+
+              {message && (
+                <div className="inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <CircleAlert className="h-4 w-4 mt-0.5 text-[#f4b400]" />
+                  <span>{message}</span>
+                </div>
+              )}
             </div>
-
-            <div>
-              <label className="text-xs text-slate-600">Numero de telephone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder={`${countryPrefixes[country]} XX XXX XXX`}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-slate-600">Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-600">Debut</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-slate-600">Fin</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleReserve}
-              disabled={isSaving}
-              className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              {isSaving ? 'Reservation...' : 'Confirmer reservation'}
-            </button>
-
-            {message && (
-              <div className="inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <CircleAlert className="h-4 w-4 mt-0.5 text-[#f4b400]" />
-                <span>{message}</span>
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 type SensorReading = {
   sensorId: string;
@@ -54,10 +56,7 @@ export function useSensorWebSocket({
            `${SPRING_URL}/ws`
          );
 
-         const SockJS = (await import('sockjs-client')).default;
-         const Stomp = await import('@stomp/stompjs');
-
-         const stompClient = new Stomp.Client({
+         const stompClient = new Client({
            webSocketFactory: () => {
              console.log('Creating SockJS connection...');
              return new SockJS(`${SPRING_URL}/ws`);

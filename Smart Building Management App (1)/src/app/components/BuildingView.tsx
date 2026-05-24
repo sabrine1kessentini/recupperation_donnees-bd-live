@@ -15,8 +15,28 @@ import { Client } from '@stomp/stompjs';
 
 const IFCRELSPACEBOUNDARY = 3451746338;
 const IFC_FILE_PATH = '/models/building.ifc';
-const TARGET_GLOBAL_ID = '0uGek424j05BaSi7k8quU_';
-const TARGET_ROOM = 'B109';
+const TARGET_ROOMS = [
+  'B109', 'B119', 'B148', 'B113',
+  'B123', 'B111', 'B139', 'B135',
+  'B125', 'B129', 'B137', 'B150',
+  'B152',
+];
+
+const ROOM_DISPLAY_NAMES: Record<string, string> = {
+  B109: 'CONFERENCE ROOM 3',
+  B125: 'CONFERENCE ROOM 1',
+  B129: 'CONFERENCE ROOM 2',
+  B150: 'MEETING ROOM 1',
+  B152: 'MEETING ROOM 2',
+  B111: 'CONFERENCE ROOM 5',
+  B123: 'MEETING ROOM 3',
+  B148: 'CONFERENCE ROOM 6',
+  B119: 'MEETING ROOM 4',
+};
+
+const ROOM_GLOBAL_IDS: Record<string, string[]> = {
+  B109: ['0uGek424j05BaSi7k8quU_'],
+};
 
 function getIfcText(value: any): string {
   if (!value) return '';
@@ -29,8 +49,18 @@ function normalizeKey(value: any): string | null {
   return text.replace(/\s+/g, ' ');
 }
 
+function getRoomSearchKeys(roomName: string): string[] {
+  const normalizedRoom = roomName.trim().toLowerCase();
+  const displayName = ROOM_DISPLAY_NAMES[roomName]?.trim().toLowerCase();
+  return [normalizedRoom, displayName].filter(Boolean) as string[];
+}
+
+function roomKeyMatches(key: string, searchKeys: string[]): boolean {
+  return searchKeys.some((searchKey) => key === searchKey || key.includes(searchKey));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Récupère la BBox réelle de B109 depuis les coordonnées IFC du space
+// Récupère une estimation de BBox depuis les propriétés IFC du space
 // En lisant ObjectPlacement + Representation du IFCSPACE
 // ─────────────────────────────────────────────────────────────────────────────
 async function getRoomBBoxFromIFC(
@@ -62,7 +92,6 @@ async function getRoomBBoxFromIFC(
 
     console.log('[BBox IFC] floorArea:', floorArea, 'height:', height, 'perimeter:', perimeter);
 
-    // B109 : NetFloorArea=1030.6, Height=14.0, GrossPerimeter=128.4
     // Ces valeurs sont en unités IFC (probablement mm → diviser par 1000, ou m directs)
     // On détecte l'unité : si floorArea > 1000, c'est du mm²
     let areaM2 = floorArea;
@@ -109,15 +138,25 @@ async function getRoomBBoxFromIFC(
   return null;
 }
 
-async function findAllRoomIds(spaceMap: Map<string, number[]>): Promise<number[]> {
+async function findAllRoomIds(spaceMap: Map<string, number[]>, roomName: string): Promise<number[]> {
   const result = new Set<number>();
-  const byGuid = spaceMap.get(TARGET_GLOBAL_ID.trim().toLowerCase());
-  if (byGuid?.length) byGuid.forEach(id => result.add(id));
-  const byName = spaceMap.get(TARGET_ROOM.trim().toLowerCase());
-  if (byName?.length) byName.forEach(id => result.add(id));
-  const byRef = spaceMap.get('conference room 3 b109');
-  if (byRef?.length) byRef.forEach(id => result.add(id));
-  console.log('[IFC] Room IDs trouvés pour B109:', Array.from(result));
+  const searchKeys = getRoomSearchKeys(roomName);
+
+  for (const searchKey of searchKeys) {
+    const byExactKey = spaceMap.get(searchKey);
+    if (byExactKey?.length) byExactKey.forEach(id => result.add(id));
+  }
+
+  for (const guid of ROOM_GLOBAL_IDS[roomName] ?? []) {
+    const byGuid = spaceMap.get(guid.trim().toLowerCase());
+    if (byGuid?.length) byGuid.forEach(id => result.add(id));
+  }
+
+  for (const [key, ids] of spaceMap.entries()) {
+    if (roomKeyMatches(key, searchKeys)) ids.forEach(id => result.add(id));
+  }
+
+  console.log(`[IFC] Room IDs trouvés pour ${roomName}:`, Array.from(result));
   return Array.from(result);
 }
 
@@ -193,9 +232,10 @@ async function findElementsForOneRoom(
 async function findAllElementsInRoom(
   manager: any,
   modelID: number,
-  spaceMap: Map<string, number[]>
+  spaceMap: Map<string, number[]>,
+  roomName: string
 ): Promise<{ ids: number[]; primaryRoomId: number | null }> {
-  const roomIds = await findAllRoomIds(spaceMap);
+  const roomIds = await findAllRoomIds(spaceMap, roomName);
   if (!roomIds.length) return { ids: [], primaryRoomId: null };
 
   const allIds = new Set<number>();
@@ -204,21 +244,15 @@ async function findAllElementsInRoom(
     ids.forEach(id => allIds.add(id));
   }
 
-  // primaryRoomId = celui qui correspond au GlobalId (l'IFCSPACE principal)
-  const primaryRoomId = spaceMap.get(TARGET_GLOBAL_ID.trim().toLowerCase())?.[0]
-    ?? roomIds[0]
-    ?? null;
+  const primaryRoomId = roomIds[0] ?? null;
 
-  console.log(`[IFC] B109 total — ${allIds.size} éléments (depuis ${roomIds.length} nœuds)`);
+  console.log(`[IFC] ${roomName} total — ${allIds.size} éléments (depuis ${roomIds.length} nœuds)`);
   return { ids: Array.from(allIds), primaryRoomId };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vue intérieure : on utilise les dimensions IFC connues de B109
-// Height=14, Area=1030, Perimeter=128 → width≈32m, depth≈32m
-// center depuis les logs : (46.28, -2.76, -29.17)
-// MAIS les unités IFC peuvent être en pieds ou en dm selon le fichier
-// On utilise donc le center connu + on estime la salle depuis l'unité du modèle
+// Vue intérieure : on utilise la BBox du subset isolé, puis les propriétés IFC
+// comme fallback si la géométrie de la salle ne suffit pas.
 // ─────────────────────────────────────────────────────────────────────────────
 function applyInteriorCamera(
   camera: THREE.PerspectiveCamera,
@@ -227,24 +261,24 @@ function applyInteriorCamera(
   roomSizeEstimate: THREE.Vector3
 ) {
   // Axe de profondeur le plus long
-  const useZ = roomSizeEstimate.z >= roomSizeEstimate.x;
-  const depth = useZ ? roomSizeEstimate.z : roomSizeEstimate.x;
+  const width = Math.max(roomSizeEstimate.x, 1);
+  const height = Math.max(roomSizeEstimate.y, 2.4);
+  const depth = Math.max(roomSizeEstimate.z, 1);
+  const useZ = depth >= width;
 
   // Plancher = center.y - hauteur/2, yeux = plancher + 1.6m
   // (en coordonnées monde Three.js, Y est vers le haut)
-  const floorY = center.y - roomSizeEstimate.y / 2;
-  const eyeY = floorY + 1.6;
+  const floorY = center.y - height / 2;
+  const eyeY = floorY + Math.min(Math.max(height * 0.35, 1.5), height * 0.75);
+  const cameraOffset = Math.max((useZ ? depth : width) * 0.22, 0.8);
+  const lookOffset = Math.max((useZ ? depth : width) * 0.28, 1.2);
 
-  let camPos: THREE.Vector3;
-  let target: THREE.Vector3;
-
-  if (useZ) {
-    camPos = new THREE.Vector3(center.x, eyeY, center.z + depth * 0.4);
-    target = new THREE.Vector3(center.x, eyeY, center.z - depth * 0.4);
-  } else {
-    camPos = new THREE.Vector3(center.x + depth * 0.4, eyeY, center.z);
-    target = new THREE.Vector3(center.x - depth * 0.4, eyeY, center.z);
-  }
+  const camPos = useZ
+    ? new THREE.Vector3(center.x, eyeY, center.z + cameraOffset)
+    : new THREE.Vector3(center.x + cameraOffset, eyeY, center.z);
+  const target = useZ
+    ? new THREE.Vector3(center.x, eyeY, center.z - lookOffset)
+    : new THREE.Vector3(center.x - lookOffset, eyeY, center.z);
 
   controls.target.copy(target);
   controls.minDistance = 0.01;
@@ -252,13 +286,41 @@ function applyInteriorCamera(
   controls.minPolarAngle = 0;
   controls.maxPolarAngle = Math.PI;
   camera.near = 0.01;
-  camera.fov = 75;
+  camera.fov = 78;
   camera.position.copy(camPos);
   camera.lookAt(target);
   camera.updateProjectionMatrix();
   controls.update();
 
   console.log('[ZOOM] Applied — center:', center, 'size:', roomSizeEstimate, 'camPos:', camPos, 'target:', target, 'eyeY:', eyeY);
+}
+
+function applyOverviewCamera(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  center: THREE.Vector3,
+  size: THREE.Vector3
+) {
+  const maxDim = Math.max(size.x, size.y, size.z, 1);
+  const distance = maxDim * 2.2;
+
+  controls.target.copy(center);
+  controls.minDistance = 0.01;
+  controls.maxDistance = 100000;
+  controls.minPolarAngle = 0;
+  controls.maxPolarAngle = Math.PI;
+  camera.near = 0.01;
+  camera.fov = 55;
+  camera.position.set(
+    center.x + distance * 0.8,
+    center.y + distance * 0.65,
+    center.z + distance * 0.9
+  );
+  camera.lookAt(center);
+  camera.updateProjectionMatrix();
+  controls.update();
+
+  console.log('[ZOOM] Overview applied — center:', center, 'size:', size, 'distance:', distance);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,6 +341,20 @@ function getCenterFromModel(model: any): THREE.Vector3 | null {
     }
   } catch (e) { /* ignore */ }
   return null;
+}
+
+function getObjectBounds(object: THREE.Object3D): { center: THREE.Vector3; size: THREE.Vector3 } | null {
+  try {
+    object.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(object);
+    if (box.isEmpty()) return null;
+    return {
+      center: box.getCenter(new THREE.Vector3()),
+      size: box.getSize(new THREE.Vector3()),
+    };
+  } catch (e) {
+    return null;
+  }
 }
 
 export function BuildingView() {
@@ -306,6 +382,7 @@ export function BuildingView() {
   const [modelStatus, setModelStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [modelError, setModelError] = useState('');
   const [isIsolated, setIsIsolated] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState('B109');
   const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
@@ -470,10 +547,12 @@ export function BuildingView() {
     if (isIsolated) {
       cleanup();
 
-      findAllElementsInRoom(manager, model.modelID, spaceMapRef.current)
+      findAllElementsInRoom(manager, model.modelID, spaceMapRef.current, selectedRoom)
         .then(async ({ ids: allIds, primaryRoomId }) => {
           if (!allIds.length) {
-            console.warn('[IFC] Aucun élément trouvé pour B109');
+            console.warn(`[IFC] Aucun élément trouvé pour ${selectedRoom}`);
+            manager.showAllItems(model.modelID);
+            setOpacity(0.15);
             return;
           }
 
@@ -483,41 +562,42 @@ export function BuildingView() {
           setOpacity(1);
 
           // Subset coloré
+          let subsetBounds: { center: THREE.Vector3; size: THREE.Vector3 } | null = null;
+
           try {
             const subset = manager.createSubset({
               modelID: model.modelID,
               ids: allIds,
               removePrevious: true,
               material: selectionMat.current,
-              customID: 'b109-subset',
+              customID: `${selectedRoom.toLowerCase()}-subset`,
             });
             if (subset) {
               subset.visible = true;
               scene.add(subset);
               subsetRef.current = subset;
+              subsetBounds = getObjectBounds(subset);
             }
           } catch (e) {
             console.warn('[IFC] Subset non créé:', e);
           }
 
-          // ── Calculer les dimensions réelles depuis les PropertySets IFC ───
-          // B109 : NetFloorArea=1030.6, Height=14.0, GrossPerimeter=128.4
-          // Ces valeurs sont déjà en mètres (IFC4 standard)
-          // width/depth depuis périmètre+aire :
-          //   P=128.4 → w+d=64.2
-          //   A=1030.6 → w*d=1030.6
-          //   discriminant = 64.2²-4*1030.6 = 4121.64-4122.4 ≈ -0.76 (très proche de 0)
-          //   → salle quasi-carrée : w ≈ d ≈ √1030.6 ≈ 32.1m
-          const roomWidth = Math.sqrt(1030.6);  // ≈ 32.1m
-          const roomDepth = Math.sqrt(1030.6);  // ≈ 32.1m
-          const roomHeight = 14.0;              // mètres
+          if (!subsetBounds && primaryRoomId) {
+            subsetBounds = await getRoomBBoxFromIFC(manager, model.modelID, primaryRoomId);
+          }
+
+          if (!subsetBounds) {
+            subsetBounds = getObjectBounds(model);
+          }
+
+          if (!subsetBounds) return;
 
           // Centre depuis les logs précédents (coordonnées Three.js réelles)
           // center = (46.28, -2.76, -29.17) — ce sont les vraies coordonnées monde
-          const roomCenter = new THREE.Vector3(46.28, -2.76, -29.17);
-          const roomSize = new THREE.Vector3(roomWidth, roomHeight, roomDepth);
+          const roomCenter = subsetBounds.center;
+          const roomSize = subsetBounds.size;
 
-          console.log('[ZOOM] roomCenter:', roomCenter, 'roomSize:', roomSize);
+          console.log(`[ZOOM] ${selectedRoom} roomCenter:`, roomCenter, 'roomSize:', roomSize);
 
           const camera = cameraRef.current;
           const controls = controlsRef.current;
@@ -550,7 +630,7 @@ export function BuildingView() {
         cameraRef.current.updateProjectionMatrix();
       }
     }
-  }, [modelStatus, isIsolated]);
+  }, [modelStatus, isIsolated, selectedRoom]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-zinc-100">
@@ -558,12 +638,26 @@ export function BuildingView() {
         <div className="flex justify-between items-center">
           <div>
             <p className="text-xs uppercase tracking-widest text-zinc-500">Jumeau Numérique</p>
-            <h1 className="text-3xl font-bold">CONFERENCE ROOM 3 (B109)</h1>
+            <h1 className="text-3xl font-bold">
+              {ROOM_DISPLAY_NAMES[selectedRoom] ?? 'Salle IFC'} ({selectedRoom})
+            </h1>
           </div>
           <div className="flex items-center gap-4">
             <span className={`text-xs px-3 py-1 rounded-full font-medium ${wsConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
               {wsConnected ? '● Live' : '○ Offline'}
             </span>
+            <select
+              value={selectedRoom}
+              onChange={(event) => setSelectedRoom(event.target.value)}
+              disabled={modelStatus !== 'loaded'}
+              className="bg-white px-4 py-3 rounded-2xl border text-sm font-medium hover:bg-amber-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {TARGET_ROOMS.map((room) => (
+                <option key={room} value={room}>
+                  {room} - {ROOM_DISPLAY_NAMES[room] ?? 'Salle'}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => setIsIsolated(v => !v)}
               disabled={modelStatus !== 'loaded'}
@@ -582,7 +676,7 @@ export function BuildingView() {
 
           {isIsolated && modelStatus === 'loaded' && (
             <div className="absolute top-4 left-4 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur">
-              👁 Vue intérieure B109 — zoom libre molette
+              Vue intérieure {selectedRoom} - zoom libre molette
             </div>
           )}
 

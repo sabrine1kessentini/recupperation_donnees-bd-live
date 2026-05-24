@@ -8,12 +8,39 @@ import { AlertTriangle, Loader } from 'lucide-react';
 
 const IFC_FILE_PATH = '/models/building.ifc';
 
+const ROOM_DISPLAY_NAMES: Record<string, string> = {
+  B109: 'CONFERENCE ROOM 3',
+  B125: 'CONFERENCE ROOM 1',
+  B129: 'CONFERENCE ROOM 2',
+  B150: 'MEETING ROOM 1',
+  B152: 'MEETING ROOM 2',
+  B111: 'CONFERENCE ROOM 5',
+  B123: 'MEETING ROOM 3',
+  B148: 'CONFERENCE ROOM 6',
+  B119: 'MEETING ROOM 4',
+};
+
+const ROOM_GLOBAL_IDS: Record<string, string[]> = {
+  B109: ['0uGek424j05BaSi7k8quU_'],
+};
+
 function normalizeKey(value: any): string | null {
   if (!value) return null;
   const text = typeof value === 'string' ? value : value.value ?? '';
   const trimmed = text.trim().toLowerCase();
   if (!trimmed) return null;
   return trimmed.replace(/\s+/g, ' ');
+}
+
+function getRoomSearchKeys(roomName: string): string[] {
+  const normalizedRoom = roomName.trim().toLowerCase();
+  const displayName = ROOM_DISPLAY_NAMES[roomName]?.trim().toLowerCase();
+  const globalIds = ROOM_GLOBAL_IDS[roomName]?.map((id) => id.trim().toLowerCase()) ?? [];
+  return [normalizedRoom, displayName, ...globalIds].filter(Boolean) as string[];
+}
+
+function roomKeyMatches(key: string, searchKeys: string[]): boolean {
+  return searchKeys.some((searchKey) => key === searchKey || key.includes(searchKey));
 }
 
 interface RoomPreviewIFCProps {
@@ -32,6 +59,9 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
 
   useEffect(() => {
     if (!mountRef.current) return;
+
+    setStatus('loading');
+    setError('');
 
     const container = mountRef.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -64,8 +94,9 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
     controls.dampingFactor = 0.1;
     controlsRef.current = controls;
 
+    let animId = 0;
     const animate = () => {
-      requestAnimationFrame(animate);
+      animId = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     };
@@ -98,7 +129,7 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
             console.log(`[IFC Preview] ${spaces.length} espaces trouvés`);
 
             // Chercher la salle correspondante
-            const targetNormalized = normalizeKey(roomName);
+            const roomSearchKeys = getRoomSearchKeys(roomName);
             let targetSpaceIds: number[] = [];
 
             spaces.forEach((space: any) => {
@@ -110,12 +141,14 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
               ].filter(Boolean) as string[];
 
               keys.forEach((key) => {
-                if (targetNormalized && key === targetNormalized) {
+                if (roomKeyMatches(key, roomSearchKeys)) {
                   targetSpaceIds.push(space.expressID);
                   console.log(`[IFC Preview] Salle trouvée: ${roomName} (ID: ${space.expressID})`);
                 }
               });
             });
+
+            targetSpaceIds = Array.from(new Set(targetSpaceIds));
 
             if (targetSpaceIds.length === 0) {
               setStatus('error');
@@ -175,6 +208,7 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
 
     return () => {
       disposed = true;
+      cancelAnimationFrame(animId);
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

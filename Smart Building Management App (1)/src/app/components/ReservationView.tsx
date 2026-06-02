@@ -1,9 +1,18 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, CheckCircle2, CircleAlert, Clock3, MapPin, Ruler } from 'lucide-react';
-import { createReservation, estimateReservationPrice, getReservationRooms, type PricingEstimateDto, type ReservationDto, type ReservationRoomDto } from '../../services/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowRight, CalendarClock, CheckCircle2, ChevronDown,
+  CircleAlert, Clock3, MapPin, Maximize2, Ruler, Users, X, Zap,
+} from 'lucide-react';
+import {
+  createReservation, estimateReservationPrice, getReservationRooms,
+  type PricingEstimateDto, type ReservationDto, type ReservationRoomDto,
+} from '../../services/api';
 import { RoomPreviewIFC } from './RoomPreviewIFC';
 
-const ALLOWED_ROOMS = new Set(['B109', 'B152', 'B135', 'B119', 'B111', 'B123', 'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139']);
+const ALLOWED_ROOMS = new Set([
+  'B109', 'B152', 'B135', 'B119', 'B111', 'B123',
+  'B125', 'B129', 'B148', 'B137', 'B113', 'B150', 'B139',
+]);
 
 const ROOM_DISPLAY_NAMES: Record<string, string> = {
   B125: 'CONFERENCE ROOM 1',
@@ -16,6 +25,15 @@ const ROOM_DISPLAY_NAMES: Record<string, string> = {
   B119: 'MEETING ROOM 4',
 };
 
+const ROOM_GRADIENTS = [
+  { from: 'from-violet-500', to: 'to-purple-700'  },
+  { from: 'from-blue-500',   to: 'to-indigo-700'  },
+  { from: 'from-teal-500',   to: 'to-cyan-700'    },
+  { from: 'from-emerald-500',to: 'to-green-700'   },
+  { from: 'from-rose-500',   to: 'to-pink-700'    },
+  { from: 'from-amber-500',  to: 'to-orange-600'  },
+];
+
 type RoomStatus = 'available' | 'reserved';
 
 type MeetingRoom = {
@@ -26,6 +44,7 @@ type MeetingRoom = {
   floor: string;
   location: string;
   capacity: string;
+  areaM2: number | null;
   status: RoomStatus;
   reservedSlot?: string | null;
   reservations: ReservationRoomDto['reservations'];
@@ -36,514 +55,694 @@ const toRoom = (room: ReservationRoomDto): MeetingRoom => ({
   name: room.name,
   displayName: ROOM_DISPLAY_NAMES[room.name] || room.longName || room.name,
   code: room.name,
-  floor: room.storey || 'Etage non renseigne',
+  floor: room.storey || 'Étage non renseigné',
   location: room.location || 'IFC',
-  capacity: room.areaM2 ? `${room.areaM2.toFixed(1)} m2` : 'Surface non renseignee',
+  capacity: room.areaM2 ? `${room.areaM2.toFixed(1)} m²` : 'Surface non renseignée',
+  areaM2: room.areaM2 ?? null,
   status: room.status,
   reservedSlot: room.reservedSlot,
   reservations: room.reservations,
 });
 
-const timeToMinutes = (time: string) => {
-  const [hours = '0', minutes = '0'] = time.split(':');
-  return Number(hours) * 60 + Number(minutes);
+/**
+ * Tarif horaire basé sur la superficie de la salle :
+ *   100–300 m²  →  100 DT/h   |   300–700 m²   →  200 DT/h
+ *   700–1500 m² →  300 DT/h   |   > 1500 m²    →  500 DT/h
+ * Heure de pointe (8h–18h jours ouvrables) = base + 50 DT/h
+ */
+const getHourlyRange = (areaM2: number | null) => {
+  const a = areaM2 ?? 0;
+  let base: number;
+  if (a >= 1500)      base = 500;
+  else if (a >= 700)  base = 300;
+  else if (a >= 300)  base = 200;
+  else                base = 100;
+  return { offPeak: base, peak: base + 50 };
 };
 
-const getOverlappingReservation = (room: MeetingRoom, date: string, startTime: string, endTime: string) =>
-  room.reservations.find((reservation) => {
-    if (reservation.date !== date) return false;
-    return timeToMinutes(startTime) < timeToMinutes(reservation.endTime)
-      && timeToMinutes(endTime) > timeToMinutes(reservation.startTime);
+const ENERGY_RATE_DT    = 0.18;   // DT/kWh
+const MIN_KWH_PER_M2_H = 0.025;  // 25 W/m² — charge minimale (éclairage seul)
+const MAX_KWH_PER_M2_H = 0.10;   // 100 W/m² — charge maximale (CVC + équipements)
+
+const getEnergyRange = (areaM2: number | null) => {
+  const a       = areaM2 ?? 20;
+  const minKwh  = +(a * MIN_KWH_PER_M2_H).toFixed(1);
+  const maxKwh  = +(a * MAX_KWH_PER_M2_H).toFixed(1);
+  const minCost = +(minKwh * ENERGY_RATE_DT).toFixed(2);
+  const maxCost = +(maxKwh * ENERGY_RATE_DT).toFixed(2);
+  return { minKwh, maxKwh, minCost, maxCost };
+};
+
+const getMaxOccupancy = (areaM2: number | null) =>
+  Math.max(4, Math.floor((areaM2 ?? 20) / 12.5));
+
+const getRoomType = (displayName: string) =>
+  displayName.toLowerCase().includes('conference') ? 'Salle de conférence' : 'Salle de réunion';
+
+const timeToMinutes = (time: string) => {
+  const [h = '0', m = '0'] = time.split(':');
+  return Number(h) * 60 + Number(m);
+};
+
+const getOverlappingReservation = (room: MeetingRoom, date: string, start: string, end: string) =>
+  room.reservations.find((r) => {
+    if (r.date !== date) return false;
+    return timeToMinutes(start) < timeToMinutes(r.endTime) && timeToMinutes(end) > timeToMinutes(r.startTime);
   });
 
-const overlapsReservation = (room: MeetingRoom, date: string, startTime: string, endTime: string) =>
-  Boolean(getOverlappingReservation(room, date, startTime, endTime));
+const overlapsReservation = (room: MeetingRoom, date: string, start: string, end: string) =>
+  Boolean(getOverlappingReservation(room, date, start, end));
 
 const formatDate = (value: string) => {
-  const [year, month, day] = value.split('-');
-  return day && month && year ? `${day}/${month}/${year}` : value;
+  const [y, m, d] = value.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : value;
 };
 
 type ReservationNotification = {
-  id: string;
-  roomName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  reservedBy: string | null;
-  email: string | null;
-  phone: string | null;
-  createdAt: string;
-  read: boolean;
+  id: string; roomName: string; date: string; startTime: string; endTime: string;
+  reservedBy: string | null; email: string | null; phone: string | null;
+  createdAt: string; read: boolean;
 };
 
 const RESERVATION_NOTIFICATION_STORAGE_KEY = 'directionReservationNotifications';
 
-const pushDirectionReservationNotification = (notification: ReservationNotification) => {
+const pushDirectionReservationNotification = (notif: ReservationNotification) => {
   try {
     const existing = localStorage.getItem(RESERVATION_NOTIFICATION_STORAGE_KEY);
     const list: ReservationNotification[] = existing ? JSON.parse(existing) : [];
-    const next = [notification, ...list].slice(0, 5);
-    localStorage.setItem(RESERVATION_NOTIFICATION_STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(RESERVATION_NOTIFICATION_STORAGE_KEY, JSON.stringify([notif, ...list].slice(0, 5)));
     window.dispatchEvent(new Event('directionReservationNotification'));
-  } catch {
-    // Ignore storage errors
-  }
+  } catch {}
 };
 
-const isReservationActive = (reservation: ReservationDto) => {
-  const now = new Date();
-  const reservationEnd = new Date(`${reservation.date}T${reservation.endTime}`);
-  return reservationEnd.getTime() > now.getTime();
-};
+const isReservationActive = (r: ReservationDto) =>
+  new Date(`${r.date}T${r.endTime}`).getTime() > Date.now();
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ReservationView() {
-  const [rooms, setRooms] = useState<MeetingRoom[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [country, setCountry] = useState('Tunisie');
-  const [phone, setPhone] = useState('+216');
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [pricingEstimate, setPricingEstimate] = useState<PricingEstimateDto | null>(null);
+  const [rooms,            setRooms]            = useState<MeetingRoom[]>([]);
+  const [selectedRoomId,   setSelectedRoomId]   = useState<string | null>(null);
+  const [showAll,          setShowAll]          = useState(false);
+  const [date,             setDate]             = useState('');
+  const [startTime,        setStartTime]        = useState('');
+  const [endTime,          setEndTime]          = useState('');
+  const [firstName,        setFirstName]        = useState('');
+  const [lastName,         setLastName]         = useState('');
+  const [country,          setCountry]          = useState('Tunisie');
+  const [phone,            setPhone]            = useState('+216');
+  const [email,            setEmail]            = useState('');
+  const [isLoading,        setIsLoading]        = useState(true);
+  const [isSaving,         setIsSaving]         = useState(false);
+  const [message,          setMessage]          = useState<string | null>(null);
+  const [pricingEstimate,  setPricingEstimate]  = useState<PricingEstimateDto | null>(null);
   const [isPricingLoading, setIsPricingLoading] = useState(false);
-  const [pricingError, setPricingError] = useState<string | null>(null);
+  const [pricingError,     setPricingError]     = useState<string | null>(null);
 
-  // Use a ref to track the latest request so stale responses are ignored
-  const latestPricingRequestRef = useRef<number>(0);
+  const latestPricingReqRef = useRef<number>(0);
 
   const countryPrefixes: Record<string, string> = {
-    Tunisie: '+216',
-    France: '+33',
-    Maroc: '+212',
-    Algerie: '+213',
-    USA: '+1',
+    Tunisie: '+216', France: '+33', Maroc: '+212', Algerie: '+213', USA: '+1',
   };
 
   const loadRooms = async () => {
     setIsLoading(true);
     try {
       const data = await getReservationRooms();
-      const filtered = data
-        .filter((room) => ALLOWED_ROOMS.has(room.name))
-        .filter((room, index, self) => index === self.findIndex((r) => r.ifcGlobalId === room.ifcGlobalId))
-        .map(toRoom);
-
-      setRooms(filtered);
-      setMessage(
-        filtered.length === 0
-          ? 'Aucune salle IFC trouvee. Verifiez que le building-service (port 8084) fonctionne.'
-          : null
+      setRooms(
+        data
+          .filter((r) => ALLOWED_ROOMS.has(r.name))
+          .filter((r, i, self) => i === self.findIndex((s) => s.ifcGlobalId === r.ifcGlobalId))
+          .map(toRoom)
       );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Impossible de charger les salles IFC.';
-      if (msg.includes('500')) {
-        setMessage('Erreur serveur (500). Verifiez les logs du building-service.');
-      } else if (msg.includes('404') || msg.includes('Failed to fetch')) {
-        setMessage('Building-service inaccessible. Verifiez que le backend est demarre sur le port 8084.');
-      } else {
-        setMessage(msg);
-      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Impossible de charger les salles.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadRooms();
-  }, []);
+  useEffect(() => { loadRooms(); }, []);
 
   const selectedRoom = useMemo(
-    () => rooms.find((room) => room.id === selectedRoomId) ?? null,
+    () => rooms.find((r) => r.id === selectedRoomId) ?? null,
     [rooms, selectedRoomId]
   );
 
-  useEffect(() => {
-    // Reset pricing state whenever inputs change
+  const closeModal = () => {
+    setSelectedRoomId(null);
+    setMessage(null);
     setPricingEstimate(null);
     setPricingError(null);
+  };
 
+  // Dynamic pricing — triggered whenever slot changes
+  useEffect(() => {
+    setPricingEstimate(null);
+    setPricingError(null);
     if (!selectedRoom || !date || !startTime || !endTime || startTime >= endTime) {
       setIsPricingLoading(false);
       return;
     }
-
-    // Increment request counter — used to ignore stale responses
-    const requestId = ++latestPricingRequestRef.current;
-
+    const reqId = ++latestPricingReqRef.current;
     setIsPricingLoading(true);
-
-    const timer = window.setTimeout(async () => {
+    const t = window.setTimeout(async () => {
       try {
-        const estimate = await estimateReservationPrice({
+        const est = await estimateReservationPrice({
           roomName: selectedRoom.code,
           startDatetime: `${date}T${startTime}`,
           endDatetime: `${date}T${endTime}`,
         });
-
-        // Only update state if this is still the latest request
-        if (requestId === latestPricingRequestRef.current) {
-          setPricingEstimate(estimate);
-          setPricingError(null);
-        }
-      } catch (error) {
-        if (requestId === latestPricingRequestRef.current) {
-          setPricingError('Prix indisponible pour ce creneau.');
-          setPricingEstimate(null);
-        }
+        if (reqId === latestPricingReqRef.current) { setPricingEstimate(est); setPricingError(null); }
+      } catch {
+        if (reqId === latestPricingReqRef.current) { setPricingError('Prix indisponible pour ce créneau.'); setPricingEstimate(null); }
       } finally {
-        if (requestId === latestPricingRequestRef.current) {
-          setIsPricingLoading(false);
-        }
+        if (reqId === latestPricingReqRef.current) setIsPricingLoading(false);
       }
     }, 350);
-
-    return () => {
-      window.clearTimeout(timer);
-      // Do NOT abort here — let any in-flight request finish,
-      // the requestId check above will discard stale results.
-    };
+    return () => window.clearTimeout(t);
   }, [selectedRoom, date, startTime, endTime]);
 
-  const getStatusUi = (isReservedForSelectedSlot: boolean) => {
-    if (!isReservedForSelectedSlot) {
-      return {
-        label: 'Disponible',
-        classes: 'bg-green-50 text-green-700 border-green-200',
-        icon: <CheckCircle2 className="h-4 w-4" />,
-      };
-    }
-    return {
-      label: 'Reservee',
-      classes: 'bg-amber-50 text-amber-700 border-amber-200',
-      icon: <Clock3 className="h-4 w-4" />,
-    };
-  };
-
   const handleReserve = async () => {
-    if (!selectedRoom) { setMessage('Selectionnez une salle.'); return; }
-    if (!date || !startTime || !endTime) { setMessage('Choisissez la date et les heures de debut/fin.'); return; }
-    if (startTime >= endTime) { setMessage("L'heure de fin doit etre apres l'heure de debut."); return; }
+    if (!selectedRoom) return;
+    if (!date || !startTime || !endTime) { setMessage('Choisissez la date et les heures.'); return; }
+    if (startTime >= endTime) { setMessage("L'heure de fin doit être après le début."); return; }
     if (overlapsReservation(selectedRoom, date, startTime, endTime)) {
-      setMessage('Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.');
+      setMessage('Ce créneau est déjà réservé. Choisissez une autre heure.');
       return;
     }
     if (pricingEstimate && !pricingEstimate.available) {
-      setMessage('Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.');
+      setMessage('Ce créneau est déjà réservé.');
       return;
     }
-
     setIsSaving(true);
     try {
-      const reservation = await createReservation({
-        ifcGlobalId: selectedRoom.id,
-        firstName,
-        lastName,
-        country,
-        phone,
-        email,
-        date,
-        startTime,
-        endTime,
+      const res = await createReservation({
+        ifcGlobalId: selectedRoom.id, firstName, lastName, country, phone, email, date, startTime, endTime,
       });
-
-      const reservedByName = reservation.reservedBy || `${firstName} ${lastName}`.trim() || null;
       pushDirectionReservationNotification({
-        id: `${reservation.id}-${Date.now()}`,
-        roomName: selectedRoom.displayName,
-        date,
-        startTime,
-        endTime,
-        reservedBy: reservedByName,
-        email: email || null,
-        phone: phone || null,
-        createdAt: new Date().toISOString(),
-        read: false,
+        id: `${res.id}-${Date.now()}`, roomName: selectedRoom.displayName, date, startTime, endTime,
+        reservedBy: res.reservedBy || `${firstName} ${lastName}`.trim() || null,
+        email: email || null, phone: phone || null,
+        createdAt: new Date().toISOString(), read: false,
       });
-
       await loadRooms();
-      setMessage(`Reservation confirmee pour ${selectedRoom.displayName} le ${date} de ${startTime} a ${endTime}.`);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Reservation impossible.';
-      setMessage(msg.includes('409') ? 'Ce creneau est deja reserve pour cette salle. Choisissez une autre heure.' : msg);
+      setMessage(`✓ Réservation confirmée pour ${selectedRoom.displayName}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Réservation impossible.';
+      setMessage(msg.includes('409') ? 'Ce créneau est déjà réservé.' : msg);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const availableCount = rooms.filter((r) => r.status === 'available').length;
+  const visibleRooms   = showAll ? rooms : rooms.slice(0, 3);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 p-8 text-slate-900">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-slate-950 mb-2">Reservation des salles</h2>
-        <p className="text-slate-600">Selectionnez une salle, date et heure pour reserver votre reunion</p>
+    <div className="min-h-full bg-[radial-gradient(circle_at_0%_0%,#f6f7f8_0,#e9ecef_45%,#e2e8ec_100%)] p-6">
+
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between rounded-3xl bg-white/70 px-6 py-5 mb-6 shadow-sm">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-800">Réservation des salles</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">
+            Explorez en 3D et réservez votre créneau en quelques secondes
+          </p>
+        </div>
+        <div className="flex items-center gap-6">
+          {[
+            { val: isLoading ? '—' : String(rooms.length),              label: 'Salles',      dot: 'bg-zinc-400'    },
+            { val: isLoading ? '—' : String(availableCount),            label: 'Disponibles', dot: 'bg-emerald-400' },
+            { val: isLoading ? '—' : String(rooms.length - availableCount), label: 'Réservées',   dot: 'bg-amber-400'   },
+          ].map(({ val, label, dot }) => (
+            <div key={label} className="text-center">
+              <p className="text-2xl font-bold text-zinc-800">{val}</p>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                <p className="text-xs text-zinc-500">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </header>
+
+      {/* ── Room grid ── */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center h-56 gap-3">
+          <div className="w-9 h-9 border-2 border-[#f4b400] border-t-transparent rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm">Chargement des salles…</p>
+        </div>
+      )}
+
+      {!isLoading && rooms.length === 0 && (
+        <div className="rounded-2xl bg-white/70 p-6 text-center text-zinc-500 text-sm shadow-sm">
+          Aucune salle trouvée. Vérifiez le building-service (port 8084).
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4">
+        {visibleRooms.map((room, idx) => {
+          const g      = ROOM_GRADIENTS[idx % ROOM_GRADIENTS.length];
+          const range  = getHourlyRange(room.areaM2);
+          const energy = getEnergyRange(room.areaM2);
+          const occ    = getMaxOccupancy(room.areaM2);
+          const type  = getRoomType(room.displayName);
+          const avail = room.status === 'available';
+
+          return (
+            <div
+              key={room.id}
+              onClick={() => setSelectedRoomId(room.id)}
+              className="group rounded-2xl bg-white shadow-sm border border-slate-200/80 overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              {/* Gradient top */}
+              <div className={`relative h-40 bg-gradient-to-br ${g.from} ${g.to} overflow-hidden`}>
+                <div className="absolute inset-0 bg-black/15" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_75%_25%,rgba(255,255,255,0.18),transparent_55%)]" />
+
+                {/* Status badge */}
+                <div className="absolute top-3 right-3">
+                  <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold backdrop-blur-sm ${
+                    avail
+                      ? 'bg-white/25 border border-white/30 text-white'
+                      : 'bg-black/25 border border-white/20 text-white/80'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${avail ? 'bg-white animate-pulse' : 'bg-white/60'}`} />
+                    {avail ? 'Disponible' : 'Réservée'}
+                  </span>
+                </div>
+
+                {/* 3D badge */}
+                <div className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-black/20 backdrop-blur-sm px-2.5 py-1 border border-white/20">
+                  <Maximize2 className="w-2.5 h-2.5 text-white/80" />
+                  <span className="text-[9px] text-white/80 font-medium">3D IFC</span>
+                </div>
+
+                {/* Room name */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/35 to-transparent px-4 pt-6 pb-3">
+                  <p className="text-[9px] text-white/65 uppercase tracking-widest mb-0.5">{type}</p>
+                  <h3 className="text-lg font-bold text-white leading-tight">{room.displayName}</h3>
+                </div>
+              </div>
+
+              {/* Card body */}
+              <div className="p-4">
+                {/* Stats */}
+                <div className="flex items-center gap-4 mb-3 flex-wrap">
+                  <span className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                    <Ruler className="w-3.5 h-3.5 text-zinc-400" /> {room.capacity}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                    <Users className="w-3.5 h-3.5 text-zinc-400" /> max {occ} pers.
+                  </span>
+                  <span className="flex items-center gap-1.5 text-zinc-500 text-xs">
+                    <MapPin className="w-3.5 h-3.5 text-zinc-400" /> {room.floor}
+                  </span>
+                </div>
+
+                {/* Hourly price range */}
+                <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 mb-3 space-y-1.5">
+                  <p className="text-[9px] text-amber-600 uppercase tracking-widest">Estimation / heure</p>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-500">Location</span>
+                    <span className="text-[11px] font-semibold text-amber-700">
+                      {range.offPeak} – {range.peak} DT
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-400">
+                      Énergie (~{energy.minKwh}–{energy.maxKwh} kWh)
+                    </span>
+                    <span className="text-[11px] font-semibold text-zinc-600">
+                      ~{energy.minCost} – ~{energy.maxCost} DT
+                    </span>
+                  </div>
+
+                  <div className="border-t border-amber-200 pt-1.5 flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-600 font-medium">Total estimé</span>
+                    <span className="text-sm font-bold text-amber-700">
+                      ~{(range.offPeak + energy.minCost).toFixed(0)} – ~{(range.peak + energy.maxCost).toFixed(0)} DT/h
+                    </span>
+                  </div>
+
+                  <p className="text-[9px] text-amber-500">Hors-pointe / Pointe (+50 DT/h)</p>
+                </div>
+
+                <button className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300 transition-all group-hover:border-[#f4b400]/40 group-hover:bg-amber-50/50">
+                  Explorer & Réserver
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
-          {isLoading && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-              Chargement des salles IFC...
-            </div>
-          )}
-          {!isLoading && rooms.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-              Aucune salle IFC trouvee.
-            </div>
-          )}
-          {rooms.map((room) => {
-            const overlappingReservation = date && startTime && endTime
-              ? getOverlappingReservation(room, date, startTime, endTime)
-              : null;
-            const statusUi = getStatusUi(Boolean(overlappingReservation));
-            const isActive = selectedRoomId === room.id;
+      {/* Voir plus */}
+      {rooms.length > 3 && (
+        <div className="mt-5 text-center">
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm text-zinc-600 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+          >
+            {showAll ? 'Réduire' : `Voir toutes les salles · ${rooms.length - 3} de plus`}
+            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showAll ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      )}
 
-            return (
-              <div
-                key={room.id}
-                className={`rounded-xl border bg-white p-5 shadow-sm transition-all ${
-                  isActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
+      {/* ── Room detail modal ── */}
+      {selectedRoom && (() => {
+        const range     = getHourlyRange(selectedRoom.areaM2);
+        const energy    = getEnergyRange(selectedRoom.areaM2);
+        const occ       = getMaxOccupancy(selectedRoom.areaM2);
+        const type      = getRoomType(selectedRoom.displayName);
+        const activeRes = selectedRoom.reservations.filter(isReservationActive);
+
+        return (
+          <div className="fixed inset-0 z-50 flex bg-black/40 backdrop-blur-sm">
+            <div className="flex w-full h-full overflow-hidden m-4 rounded-3xl shadow-2xl border border-slate-200">
+
+              {/* ── Left: 3D + info ── */}
+              <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+
+                {/* Modal header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-950">{room.displayName}</h3>
-                    <p className="text-sm text-slate-600 mt-1">{room.code} - {room.floor}</p>
-                    <p className="text-xs text-slate-500 mt-1">{room.location}</p>
+                    <p className="text-[10px] text-zinc-400 uppercase tracking-widest">{type} · {selectedRoom.code}</p>
+                    <h2 className="text-xl font-bold text-zinc-900 mt-0.5">{selectedRoom.displayName}</h2>
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${statusUi.classes}`}>
-                    {statusUi.icon}
-                    {statusUi.label}
-                  </span>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-5 text-sm">
-                  <span className="inline-flex items-center gap-2 text-slate-700">
-                    <Ruler className="h-4 w-4 text-slate-500" />
-                    Surface: {room.capacity}
-                  </span>
-                  <span className="inline-flex items-center gap-2 text-slate-700">
-                    <MapPin className="h-4 w-4 text-slate-500" />
-                    {room.floor}
-                  </span>
-                  {overlappingReservation && (
-                    <span className="inline-flex items-center gap-2 text-slate-700">
-                      <Clock3 className="h-4 w-4 text-slate-500" />
-                      Reservee de {overlappingReservation.startTime} a {overlappingReservation.endTime}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4">
                   <button
-                    onClick={() => setSelectedRoomId(room.id)}
-                    className="rounded-lg bg-[#f4b400] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#e1a600]"
+                    onClick={closeModal}
+                    className="rounded-full bg-slate-100 p-2 text-zinc-500 hover:text-zinc-900 hover:bg-slate-200 transition-all"
                   >
-                    Reserver
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {room.reservations.filter(isReservationActive).length > 0 && (
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-xs font-medium text-slate-600">Reservations</p>
-                    <div className="mt-2 space-y-2">
-                      {room.reservations.filter(isReservationActive).slice(0, 3).map((reservation) => (
-                        <div key={reservation.id} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-                          <p className="font-medium text-slate-900">{formatDate(reservation.date)}</p>
-                          <p className="mt-1">Debut: {reservation.startTime} - Fin: {reservation.endTime}</p>
-                          {reservation.reservedBy && <p className="mt-1 text-slate-500">{reservation.reservedBy}</p>}
+                {/* 3D viewer */}
+                <div className="relative bg-slate-50 flex-shrink-0 border-b border-slate-100" style={{ height: '350px' }}>
+                  <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-full bg-white/90 border border-slate-200 px-3 py-1.5 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-[#f4b400]" />
+                    <span className="text-[10px] text-zinc-600 font-medium">Vue 3D IFC — {selectedRoom.displayName}</span>
+                  </div>
+                  <RoomPreviewIFC roomName={selectedRoom.code} />
+                </div>
+
+                {/* Details */}
+                <div className="p-6 space-y-5">
+
+                  {/* Key metrics */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { icon: Ruler,  label: 'Surface',      value: selectedRoom.capacity },
+                      { icon: Users,  label: 'Capacité max', value: `${occ} personnes`   },
+                      { icon: MapPin, label: 'Emplacement',  value: selectedRoom.floor    },
+                    ].map(({ icon: Icon, label, value }) => (
+                      <div key={label} className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                        <Icon className="w-4 h-4 text-[#f4b400] mb-2" />
+                        <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">{label}</p>
+                        <p className="text-sm font-semibold text-zinc-800">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Hourly price range detail */}
+                  <div className="rounded-2xl bg-amber-50 border border-amber-100 p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-semibold text-zinc-800">Estimation de prix / heure</span>
+                    </div>
+
+                    {/* Location row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="rounded-xl bg-white border border-amber-100 p-3">
+                        <p className="text-[10px] text-zinc-400 mb-1">Location · Hors-pointe</p>
+                        <p className="text-2xl font-bold text-amber-600">
+                          {range.offPeak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-white border border-amber-100 p-3">
+                        <p className="text-[10px] text-zinc-400 mb-1">Location · Pointe (+50 DT/h)</p>
+                        <p className="text-2xl font-bold text-amber-600">
+                          {range.peak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Energy row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="rounded-xl bg-white border border-slate-100 p-3">
+                        <p className="text-[10px] text-zinc-400 mb-1">Énergie min (~{energy.minKwh} kWh)</p>
+                        <p className="text-2xl font-bold text-zinc-600">
+                          ~{energy.minCost} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-white border border-slate-100 p-3">
+                        <p className="text-[10px] text-zinc-400 mb-1">Énergie max (~{energy.maxKwh} kWh)</p>
+                        <p className="text-2xl font-bold text-zinc-600">
+                          ~{energy.maxCost} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Total row */}
+                    <div className="rounded-xl bg-amber-100/60 border border-amber-200 px-4 py-3 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-zinc-700">Total estimé / heure</span>
+                      <span className="text-xl font-bold text-amber-700">
+                        ~{(range.offPeak + energy.minCost).toFixed(0)}
+                        <span className="text-zinc-400 font-normal text-sm mx-1.5">–</span>
+                        ~{(range.peak + energy.maxCost).toFixed(0)}
+                        <span className="text-sm font-normal text-zinc-400 ml-1">DT/h</span>
+                      </span>
+                    </div>
+
+                    {/* Price breakdown explanation */}
+                    <div className="border-t border-amber-200 pt-3 space-y-2">
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">Comment est calculé le prix ?</p>
+                      <div className="space-y-1.5 text-xs text-zinc-600">
+                        <div className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+                          <span>
+                            <strong className="text-zinc-700">Location :</strong> tarif basé sur la superficie —
+                            100–300 m² = 100 DT/h · 300–700 m² = 200 DT/h · 700–1500 m² = 300 DT/h · +1500 m² = 500 DT/h.
+                            Pointe (8h–18h jours ouvrables) : +50 DT/h.
+                          </span>
                         </div>
+                        <div className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+                          <span>
+                            <strong className="text-zinc-700">Énergie :</strong> entre {energy.minKwh} kWh/h (charge minimale)
+                            et {energy.maxKwh} kWh/h (pleine charge CVC) × 0,18 DT/kWh
+                            = ~{energy.minCost} – ~{energy.maxCost} DT/h.
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 mt-1.5 flex-shrink-0" />
+                          <span className="text-zinc-400 italic">
+                            Le prix exact (énergie prédite par ML) apparaît dans le formulaire dès que vous choisissez une date et des heures.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Equipments */}
+                  <div>
+                    <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">Équipements inclus</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['Climatisation', 'Projecteur', 'Wi-Fi haut débit', 'Tableau blanc', 'Visioconférence', 'Prise secteur'].map((f) => (
+                        <span key={f} className="rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs text-zinc-600">{f}</span>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
 
-        <div className="h-fit sticky top-6 space-y-4">
-          {selectedRoom && (
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-slate-200 bg-slate-50">
-                <h3 className="font-semibold text-slate-950 text-sm">Apercu 3D - {selectedRoom.displayName}</h3>
-              </div>
-              <div className="w-full h-80">
-                <RoomPreviewIFC roomName={selectedRoom.code} />
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 text-slate-950">
-              <CalendarClock className="h-5 w-5 text-[#f4b400]" />
-              <h3 className="font-semibold">Nouvelle reservation</h3>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-600">Salle choisie</label>
-                <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                  {selectedRoom ? `${selectedRoom.displayName} (${selectedRoom.code})` : 'Aucune salle selectionnee'}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-600">Nom</label>
-                  <input
-                    type="text"
-                    placeholder="Entrer votre nom"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600">Prenom</label>
-                  <input
-                    type="text"
-                    placeholder="Entrer votre prenom"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-600">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="exemple@domaine.com"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-600">Pays</label>
-                <select
-                  value={country}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    setCountry(selected);
-                    setPhone(countryPrefixes[selected] || '');
-                  }}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                >
-                  <option value="Tunisie">Tunisie</option>
-                  <option value="France">France</option>
-                  <option value="Maroc">Maroc</option>
-                  <option value="Algerie">Algerie</option>
-                  <option value="USA">USA</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-600">Numero de telephone</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder={`${countryPrefixes[country]} XX XXX XXX`}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-600">Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-600">Debut</label>
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600">Fin</label>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[#f4b400]"
-                  />
-                </div>
-              </div>
-
-              {selectedRoom && date && startTime && endTime && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                  {isPricingLoading && (
-                    <p className="text-slate-600">Calcul du prix...</p>
-                  )}
-                  {!isPricingLoading && pricingError && (
-                    <p className="text-amber-700">{pricingError}</p>
-                  )}
-                  {!isPricingLoading && pricingEstimate && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Duree</span>
-                        <span className="font-medium">{pricingEstimate.duration_hours} h</span>
+                  {/* Upcoming reservations */}
+                  {activeRes.length > 0 && (
+                    <div>
+                      <p className="text-xs text-zinc-400 uppercase tracking-widest mb-3">Créneaux déjà réservés</p>
+                      <div className="space-y-2">
+                        {activeRes.slice(0, 4).map((r) => (
+                          <div key={r.id} className="flex items-center gap-3 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+                            <Clock3 className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <div>
+                              <p className="text-xs font-medium text-zinc-800">
+                                {formatDate(r.date)} · {r.startTime.slice(0, 5)} – {r.endTime.slice(0, 5)}
+                              </p>
+                              {r.reservedBy && <p className="text-[10px] text-zinc-400 mt-0.5">{r.reservedBy}</p>}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Consommation predite</span>
-                        <span className="font-medium">{pricingEstimate.predicted_kwh} kWh</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Location</span>
-                        <span className="font-medium">{pricingEstimate.rental_cost_dt} DT</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Energie</span>
-                        <span className="font-medium">{pricingEstimate.energy_cost_dt} DT</span>
-                      </div>
-                      <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-base">
-                        <span className="font-semibold text-slate-950">Prix estime</span>
-                        <span className="font-bold text-[#f4b400]">{pricingEstimate.total_price_dt} DT</span>
-                      </div>
-                      {!pricingEstimate.available && (
-                        <p className="text-xs text-amber-700">Ce creneau est deja reserve.</p>
-                      )}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
-              <button
-                onClick={handleReserve}
-                disabled={isSaving}
-                className="w-full rounded-lg bg-[#f4b400] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#e1a600] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-              >
-                {isSaving ? 'Reservation...' : 'Confirmer reservation'}
-              </button>
+              {/* ── Right: form ── */}
+              <div className="w-[390px] flex-shrink-0 bg-slate-50 border-l border-slate-200 overflow-y-auto">
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-6">
+                    <CalendarClock className="w-5 h-5 text-[#f4b400]" />
+                    <h3 className="font-bold text-zinc-900">Nouvelle réservation</h3>
+                  </div>
 
-              {message && (
-                <div className="inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  <CircleAlert className="h-4 w-4 mt-0.5 text-[#f4b400]" />
-                  <span>{message}</span>
+                  <div className="space-y-4">
+
+                    {/* User info */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Nom',    val: lastName,  set: setLastName,  ph: 'Dupont' },
+                        { label: 'Prénom', val: firstName, set: setFirstName, ph: 'Jean'   },
+                      ].map(({ label, val, set, ph }) => (
+                        <div key={label}>
+                          <label className="text-xs text-zinc-500">{label}</label>
+                          <input
+                            type="text" placeholder={ph} value={val}
+                            onChange={(e) => set(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all placeholder-zinc-300"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-zinc-500">Email</label>
+                      <input
+                        type="email" placeholder="exemple@domaine.com" value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all placeholder-zinc-300"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-zinc-500">Pays</label>
+                        <select
+                          value={country}
+                          onChange={(e) => { setCountry(e.target.value); setPhone(countryPrefixes[e.target.value] || ''); }}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all"
+                        >
+                          {Object.keys(countryPrefixes).map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-zinc-500">Téléphone</label>
+                        <input
+                          type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date & time */}
+                    <div className="border-t border-slate-200 pt-4">
+                      <label className="text-xs text-zinc-500">Date</label>
+                      <input
+                        type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Début', val: startTime, set: setStartTime },
+                        { label: 'Fin',   val: endTime,   set: setEndTime   },
+                      ].map(({ label, val, set }) => (
+                        <div key={label}>
+                          <label className="text-xs text-zinc-500">{label}</label>
+                          <input
+                            type="time" value={val} onChange={(e) => set(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-[#f4b400] transition-all"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Dynamic pricing — shown as soon as date+times are valid */}
+                    {date && startTime && endTime && startTime < endTime && (
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        {isPricingLoading && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-3.5 h-3.5 border border-[#f4b400] border-t-transparent rounded-full animate-spin" />
+                            <p className="text-xs text-zinc-500">Calcul du prix…</p>
+                          </div>
+                        )}
+                        {!isPricingLoading && pricingError && (
+                          <p className="text-xs text-amber-600">{pricingError}</p>
+                        )}
+                        {!isPricingLoading && pricingEstimate && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-zinc-500">Durée</span>
+                              <span className="font-medium text-zinc-900">{pricingEstimate.duration_hours} h</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-zinc-500">Consommation prédite</span>
+                              <span className="font-medium text-zinc-900">{pricingEstimate.predicted_kwh} kWh</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-zinc-500">Location</span>
+                              <span className="font-medium text-zinc-900">{pricingEstimate.rental_cost_dt} DT</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-zinc-500">Énergie</span>
+                              <span className="font-medium text-zinc-900">{pricingEstimate.energy_cost_dt} DT</span>
+                            </div>
+                            <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
+                              <span className="text-sm font-semibold text-zinc-900">Prix estimé</span>
+                              <span className="text-xl font-bold text-[#f4b400]">
+                                {pricingEstimate.total_price_dt}
+                                <span className="text-sm font-normal text-zinc-400"> DT</span>
+                              </span>
+                            </div>
+                            {!pricingEstimate.available && (
+                              <p className="text-xs text-amber-600">⚠ Ce créneau est déjà réservé.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hint when slot not yet filled */}
+                    {(!date || !startTime || !endTime || startTime >= endTime) && (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-zinc-400 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-zinc-300 flex-shrink-0" />
+                        Remplissez la date et les heures pour voir le prix exact
+                      </div>
+                    )}
+
+                    {/* Submit */}
+                    <button
+                      onClick={handleReserve}
+                      disabled={isSaving}
+                      className="w-full rounded-xl bg-[#f4b400] px-4 py-3 text-sm font-bold text-white hover:bg-[#e1a600] active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all"
+                    >
+                      {isSaving ? 'Réservation en cours…' : 'Confirmer la réservation'}
+                    </button>
+
+                    {message && (
+                      <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs ${
+                        message.startsWith('✓')
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : 'bg-amber-50 border-amber-200 text-amber-800'
+                      }`}>
+                        <CircleAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{message}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
+
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 }

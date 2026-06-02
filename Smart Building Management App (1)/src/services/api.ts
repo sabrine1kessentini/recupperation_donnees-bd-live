@@ -306,6 +306,31 @@ export const resolveAlert = async (id: number): Promise<AlertDto> => {
   return res.json() as Promise<AlertDto>;
 };
 
+// ─── Comfort Agent Types & API ───────────────────────────────────────────────
+
+const COMFORT_AGENT_URL = import.meta.env.VITE_COMFORT_AGENT_URL || 'http://localhost:8001';
+
+export type ComfortAlertLevel = 'critical' | 'warning' | 'info';
+
+export type ComfortAlertItem = {
+  room: string;
+  level: ComfortAlertLevel;
+  type: string;
+  message: string;
+  action: string;
+};
+
+export type ComfortAlertsResponse = {
+  timestamp: string;
+  total: number;
+  critical: ComfortAlertItem[];
+  warnings: ComfortAlertItem[];
+  infos: ComfortAlertItem[];
+};
+
+export const getComfortAlerts = (): Promise<ComfortAlertsResponse> =>
+  get('/api/comfort/alerts', COMFORT_AGENT_URL);
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 export const getEnergyComparison = (): Promise<EnergyComparisonDto> =>
@@ -364,6 +389,105 @@ export const createReservation = (request: ReservationRequest): Promise<Reservat
 
 export const getConsumptionByUsage = (): Promise<ConsumptionByUsageDto> =>
   get('/api/measurements/consumption-by-usage');
+
+// ─── Comfort Agent API (port 8001) ────────────────────────────────────────────
+
+const COMFORT_API_URL = 'http://localhost:8001';
+
+export type ComfortDimensions = {
+  temperature?: number;
+  humidity?: number;
+  co2?: number;
+  luminosity?: number;
+};
+
+export type ComfortScore = {
+  overall: number | null;
+  dimensions: ComfortDimensions;
+  label: string;
+};
+
+export type ComfortAlert = {
+  room?: string;
+  level: 'critical' | 'warning' | 'info';
+  type: string;
+  message: string;
+  action: string;
+};
+
+export type RoomComfortState = {
+  room: string;
+  timestamp: string;
+  sensors: {
+    temperature: number | null;
+    humidity: number | null;
+    co2: number | null;
+    luminosity: number | null;
+    occupancy: number | null;
+  };
+  comfort: ComfortScore;
+  alerts: ComfortAlert[];
+  reservation: {
+    is_reserved: boolean;
+    is_preheating: boolean;
+    mins_to_next: number | null;
+  };
+  hvac: {
+    occupied: boolean;
+    is_preheating: boolean;
+    decision_source: string;
+    confidence?: number;
+    model_used?: string;
+    hvac: { mode: string; is_on: boolean; power_kw: number };
+    ventilation: { is_on: boolean; boost: boolean; rate: string; power_kw: number };
+    lighting: { is_on: boolean; power_kw: number };
+    projector: { is_on: boolean; power_kw: number };
+    total_kw: number;
+    explanation: string;
+  };
+  profile: { type: string; capacity: number; priority: string };
+  error?: string;
+};
+
+export type AllComfortState = {
+  timestamp: string;
+  summary: {
+    total_rooms: number;
+    occupied_rooms: number;
+    avg_comfort_score: number | null;
+    critical_alerts: number;
+    warning_alerts: number;
+  };
+  rooms: RoomComfortState[];
+};
+
+export async function getAllComfort(): Promise<AllComfortState> {
+  const res = await fetch(`${COMFORT_API_URL}/api/comfort/all`);
+  if (!res.ok) throw new Error(`Comfort API error ${res.status}`);
+  return res.json() as Promise<AllComfortState>;
+}
+
+export async function getRoomComfortState(room: string): Promise<RoomComfortState> {
+  const res = await fetch(`${COMFORT_API_URL}/api/comfort/state/${room}`);
+  if (!res.ok) throw new Error(`Comfort API error ${res.status}`);
+  return res.json() as Promise<RoomComfortState>;
+}
+
+export type ChatMessage = {
+  role: 'user' | 'agent';
+  text: string;
+  timestamp: Date;
+};
+
+export async function chatWithAgent(question: string, room?: string): Promise<{ answer: string; llm_available: boolean }> {
+  const res = await fetch(`${COMFORT_API_URL}/api/comfort/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, room: room ?? null }),
+  });
+  if (!res.ok) throw new Error(`Chat API error ${res.status}`);
+  return res.json() as Promise<{ answer: string; llm_available: boolean }>;
+}
 
 // ─── Auth API ───────────────────────────────────────────────────────────────────
 

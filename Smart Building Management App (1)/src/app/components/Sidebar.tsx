@@ -11,6 +11,7 @@ import {
   CalendarClock,
   DoorOpen,
   Network,
+  Gauge,
 } from 'lucide-react';
 import { getRoles, logout } from '../../utils/auth';
 
@@ -30,16 +31,12 @@ interface MenuItem {
 
 const ALL_MENU_ITEMS: MenuItem[] = [
   { id: 'dashboard',   icon: LayoutDashboard, label: 'Dashboard',   allowedRoles: [] },
-  { id: 'room-b109',   icon: DoorOpen,        label: 'Salle B109',  allowedRoles: [] },
   { id: 'energy',      icon: Zap,             label: 'Energy',      allowedRoles: [] },
   { id: 'environment', icon: Thermometer,     label: 'Environment', allowedRoles: [] },
   { id: 'occupancy',   icon: Users,           label: 'Occupancy',   allowedRoles: [] },
   { id: 'reservation', icon: CalendarClock,   label: 'Reservation', allowedRoles: [] },
   { id: 'building',    icon: Building2,       label: 'Building',    allowedRoles: [] },
-
-  { id: 'digitalTwin', icon: Network, label: 'Digital Twin', allowedRoles: [] },
-
-  { id: 'alerts',      icon: Bell,            label: 'Alerts',      allowedRoles: [] }, // visible to all
+  { id: 'comfort',     icon: Gauge,   label: 'Confort',     allowedRoles: [] }, // visible to all
   { id: 'analytics',   icon: BarChart3,       label: 'Analytics',   allowedRoles: [] },
 ];
 

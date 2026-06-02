@@ -10,6 +10,7 @@ import {
 import wasmUrl from 'web-ifc/web-ifc.wasm?url';
 import { IFCLoader } from 'web-ifc-three/IFCLoader';
 import { AlertTriangle, Building2, Layers } from 'lucide-react';
+import { registerIFCLoader } from './ifc-shared';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 
@@ -493,6 +494,9 @@ export function BuildingView() {
             } catch (e) {
               console.error('[IFC] Erreur indexation:', e);
             }
+
+            // Partager le loader avec RoomPreviewIFC pour éviter le conflit modelID
+            registerIFCLoader(loader, ifcModel.modelID, spaceMapRef.current);
 
             const mats = Array.isArray(ifcModel.material)
               ? ifcModel.material : [ifcModel.material];

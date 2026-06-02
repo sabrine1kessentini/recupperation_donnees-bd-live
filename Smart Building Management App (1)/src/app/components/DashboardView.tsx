@@ -4,7 +4,7 @@ import {
   Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, Droplets,
   Lightbulb, Lock, Snowflake, Square, Sun, Thermometer, Wind, Zap, RefreshCw
 } from 'lucide-react';
-import { getWaveonSession, getAllRecentMeasurements, getReservationRooms, getEnergyComparison, getAllAlerts, type SensorMeasurement, type WaveonSession, type ReservationDto, type ReservationRoomDto, type EnergyComparisonDto, type AlertDto } from '../../services/api';
+import { getWaveonSession, getAllRecentMeasurements, getReservationRooms, getEnergyComparison, getAllAlerts, getComfortAlerts, type SensorMeasurement, type WaveonSession, type ReservationDto, type ReservationRoomDto, type EnergyComparisonDto, type AlertDto, type ComfortAlertsResponse, type ComfortAlertItem } from '../../services/api';
 
 type WeatherData = {
   temperature: number;
@@ -42,6 +42,10 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
   const [weeklyAlerts, setWeeklyAlerts] = useState<AlertDto[]>([]);
   const [isAlertsLoading, setIsAlertsLoading] = useState(true);
   const [alertsError, setAlertsError] = useState<string | null>(null);
+
+  const [comfortAlerts, setComfortAlerts] = useState<ComfortAlertsResponse | null>(null);
+  const [isComfortAlertsLoading, setIsComfortAlertsLoading] = useState(true);
+  const [comfortAlertsError, setComfortAlertsError] = useState<string | null>(null);
 
   const [reservationHistory, setReservationHistory] = useState<ReservationDto[]>([]);
 
@@ -304,6 +308,26 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
     return () => window.clearInterval(alertsInterval);
   }, []);
 
+  const loadComfortAlerts = async () => {
+    setIsComfortAlertsLoading(true);
+    setComfortAlertsError(null);
+    try {
+      const data = await getComfortAlerts();
+      setComfortAlerts(data);
+    } catch {
+      setComfortAlertsError('Agent confort indisponible (port 8001).');
+      setComfortAlerts(null);
+    } finally {
+      setIsComfortAlertsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadComfortAlerts();
+    const comfortInterval = window.setInterval(loadComfortAlerts, 60000);
+    return () => window.clearInterval(comfortInterval);
+  }, []);
+
   // Stats calculées depuis les vraies mesures
   const tempMeasurements = measurements.filter(m => m.sensorType === 'temperature');
   const humMeasurements = measurements.filter(m => m.sensorType === 'humidity');
@@ -518,6 +542,31 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
           {alertsError && <p className="text-xs text-red-600 mt-2">{alertsError}</p>}
         </article>
 
+        {comfortAlerts && comfortAlerts.critical.length > 0 && (
+          <article className="col-span-12 rounded-3xl bg-red-50/90 p-5 border border-red-300">
+            <div className="flex items-center gap-2 text-red-700 mb-3">
+              <AlertTriangle className="w-4 h-4" />
+              <h3 className="font-semibold">Alertes critiques de confort — Action immédiate requise</h3>
+              <span className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                {comfortAlerts.critical.length} critique{comfortAlerts.critical.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {comfortAlerts.critical.map((alert, idx) => (
+                <div key={`crit-${alert.room}-${alert.type}-${idx}`} className="rounded-2xl bg-white border border-red-200 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-zinc-800">{alert.room}</span>
+                    <span className="text-xs text-zinc-400 capitalize ml-auto">{alert.type}</span>
+                  </div>
+                  <p className="text-sm text-zinc-700">{alert.message}</p>
+                  <p className="text-xs text-red-600 mt-1">→ {alert.action}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
+
         {unreadNotifications.length > 0 && (
           <article className="col-span-12 rounded-3xl bg-[#fff7d8]/90 p-5 border border-amber-200">
             <div className="flex items-center gap-2 text-zinc-700 mb-3">
@@ -599,11 +648,116 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
             </div>
           )}
         </article>
-                <article className="col-span-5 rounded-3xl bg-white/75 p-5">
-          <div className="flex items-center gap-3 text-zinc-700 mb-2">
-            <CalendarClock className="w-5 h-5 text-[#f4b400]" />
-            <h3 className="font-semibold">Résumé du jour</h3>
+                <article className="col-span-7 rounded-3xl bg-white/75 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-zinc-700">
+              <Thermometer className="w-5 h-5 text-orange-400" />
+              <h3 className="font-semibold">Alertes de confort — Agent Confort</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {comfortAlerts && (
+                <span className="text-xs text-zinc-400">
+                  {new Date(comfortAlerts.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {comfortAlerts && comfortAlerts.total > 0 && (
+                <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                  {comfortAlerts.total} alerte{comfortAlerts.total > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
           </div>
+
+          {isComfortAlertsLoading && (
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 text-center">
+              Chargement des alertes de confort…
+            </div>
+          )}
+
+          {comfortAlertsError && !isComfortAlertsLoading && (
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              {comfortAlertsError}
+            </div>
+          )}
+
+          {!isComfortAlertsLoading && comfortAlerts && comfortAlerts.total === 0 && (
+            <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+              Toutes les salles sont dans des conditions de confort optimales.
+            </div>
+          )}
+
+          {!isComfortAlertsLoading && comfortAlerts && comfortAlerts.total > 0 && (
+            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+              {[
+                ...comfortAlerts.critical,
+                ...comfortAlerts.warnings,
+                ...comfortAlerts.infos,
+              ].map((alert: ComfortAlertItem, idx) => (
+                <div
+                  key={`${alert.room}-${alert.type}-${idx}`}
+                  className={`rounded-2xl px-4 py-3 flex items-start gap-3 ${
+                    alert.level === 'critical'
+                      ? 'bg-red-50 border border-red-200'
+                      : alert.level === 'warning'
+                      ? 'bg-amber-50 border border-amber-200'
+                      : 'bg-blue-50 border border-blue-100'
+                  }`}
+                >
+                  <span
+                    className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${
+                      alert.level === 'critical'
+                        ? 'bg-red-500'
+                        : alert.level === 'warning'
+                        ? 'bg-amber-500'
+                        : 'bg-blue-400'
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          alert.level === 'critical'
+                            ? 'bg-red-100 text-red-700'
+                            : alert.level === 'warning'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {alert.level === 'critical' ? 'Critique' : alert.level === 'warning' ? 'Avertissement' : 'Info'}
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-700">{alert.room}</span>
+                      <span className="text-xs text-zinc-400 capitalize">{alert.type}</span>
+                    </div>
+                    <p className="text-sm text-zinc-700 mt-0.5">{alert.message}</p>
+                    <p className={`text-xs mt-0.5 ${
+                      alert.level === 'critical' ? 'text-red-600' : alert.level === 'warning' ? 'text-amber-600' : 'text-blue-600'
+                    }`}>
+                      → {alert.action}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isComfortAlertsLoading && comfortAlerts && (
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-4 text-xs text-zinc-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Critique : {comfortAlerts.critical.length}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                Avertissement : {comfortAlerts.warnings.length}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                Info : {comfortAlerts.infos.length}
+              </span>
+            </div>
+          )}
         </article>
       </section>
     </div>

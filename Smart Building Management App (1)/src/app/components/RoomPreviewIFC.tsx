@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { IFCSPACE } from 'web-ifc';
 import wasmUrl from 'web-ifc/web-ifc.wasm?url';
 import { IFCLoader } from 'web-ifc-three/IFCLoader';
 import { AlertTriangle, Loader } from 'lucide-react';
+import { getIFCSharedState, registerIFCLoader } from './ifc-shared';
 
 const IFC_FILE_PATH = '/models/building.ifc';
 
@@ -43,19 +44,28 @@ function roomKeyMatches(key: string, searchKeys: string[]): boolean {
   return searchKeys.some((searchKey) => key === searchKey || key.includes(searchKey));
 }
 
+/** Cherche les expressIDs de la salle dans la spaceMap de BuildingView. */
+function findInSpaceMap(spaceMap: Map<string, number[]>, roomName: string): number[] {
+  const searchKeys = getRoomSearchKeys(roomName);
+  const result = new Set<number>();
+  for (const [key, ids] of spaceMap.entries()) {
+    if (roomKeyMatches(key, searchKeys)) ids.forEach(id => result.add(id));
+  }
+  return Array.from(result);
+}
+
 interface RoomPreviewIFCProps {
   roomName: string;
 }
 
 export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const mountRef    = useRef<HTMLDivElement>(null);
+  const cameraRef   = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const loaderRef   = useRef<any>(null);
 
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [error, setError] = useState('');
+  const [error,  setError]  = useState('');
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -64,22 +74,17 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
     setError('');
 
     const container = mountRef.current;
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer  = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0xf5f0e4, 1);
     container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf5f0e4);
-    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
-      55,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      10000
+      55, container.clientWidth / container.clientHeight, 0.1, 10000
     );
     camera.position.set(25, 35, 55);
     cameraRef.current = camera;
@@ -90,11 +95,12 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
     scene.add(dirLight);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.1;
+    controls.enableDamping  = true;
+    controls.dampingFactor  = 0.1;
     controlsRef.current = controls;
 
-    let animId = 0;
+    let animId   = 0;
+    let disposed = false;
     const animate = () => {
       animId = requestAnimationFrame(animate);
       controls.update();
@@ -102,96 +108,130 @@ export function RoomPreviewIFC({ roomName }: RoomPreviewIFCProps) {
     };
     animate();
 
-    let disposed = false;
+    // ─── Helpers pour créer le subset et zoomer ────────────────────────────
+    function applySubset(loader: any, modelID: number, targetIds: number[]) {
+      const selectionMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4a90e2, metalness: 0.2, roughness: 0.8,
+      });
+
+      const subset = loader.ifcManager.createSubset({
+        modelID,
+        ids: targetIds,
+        scene,
+        removePrevious: false,
+        material: selectionMaterial,
+      });
+
+      if (subset) {
+        const box      = new THREE.Box3().setFromObject(subset);
+        const center   = box.getCenter(new THREE.Vector3());
+        const size     = box.getSize(new THREE.Vector3());
+        const distance = Math.max(size.x, size.y, size.z) * 2.5;
+        cameraRef.current?.position.set(
+          center.x + distance * 0.6,
+          center.y + distance * 0.9,
+          center.z + distance * 1.1,
+        );
+        cameraRef.current?.lookAt(center);
+        controlsRef.current?.target.copy(center);
+      }
+      setStatus('loaded');
+    }
 
     (async () => {
       try {
+        // ── Cas 1 : BuildingView déjà chargé → réutiliser son loader (modelID=0) ──
+        // Attendre 500ms pour laisser le temps à BuildingView d'enregistrer son loader
+        // (cas où les deux composants montent quasi simultanément)
+        await new Promise(r => setTimeout(r, 500));
+
+        const shared = getIFCSharedState();
+        if (shared) {
+          console.log(`[IFC Preview] Utilisation du loader partagé (modelID=${shared.modelID})`);
+          const targetIds = findInSpaceMap(shared.spaceMap, roomName);
+          console.log(`[IFC Preview] ${targetIds.length} espaces trouvés via spaceMap partagée`);
+
+          if (disposed) return;
+
+          if (targetIds.length === 0) {
+            setStatus('error');
+            setError(`Salle ${roomName} non trouvée`);
+            return;
+          }
+
+          applySubset(shared.loader, shared.modelID, targetIds);
+          return;
+        }
+
+        // ── Cas 2 : BuildingView absent → charger le fichier indépendamment ──
+        // (utilisateur sur la page Réservation sans passer par la page Building)
+        // Dans ce cas, le WASM est frais et attribue modelID=0 → getAllItemsOfType fonctionne.
+        console.log('[IFC Preview] Pas de loader partagé — chargement autonome');
         const loader = new IFCLoader();
+        loaderRef.current = loader;
         const wasmPath = wasmUrl.replace(/web-ifc\.wasm$/, '');
         await loader.ifcManager.setWasmPath(wasmPath);
-
-        console.log(`[IFC Preview] Chargement : ${IFC_FILE_PATH}`);
 
         loader.load(
           IFC_FILE_PATH,
           async (ifcModel: any) => {
-            if (disposed) return;
+            if (disposed || !ifcModel?.ifcManager) return;
 
-            console.log('[IFC Preview] Modèle chargé');
+            console.log('[IFC Preview] Modèle chargé, modelID:', ifcModel.modelID);
+            const modelID = ifcModel.modelID;
 
-            // Récupérer toutes les salles
-            const spaces = await ifcModel.ifcManager.getAllItemsOfType(
-              ifcModel.modelID,
-              IFCSPACE,
-              true
-            );
-
-            console.log(`[IFC Preview] ${spaces.length} espaces trouvés`);
-
-            // Chercher la salle correspondante
-            const roomSearchKeys = getRoomSearchKeys(roomName);
-            let targetSpaceIds: number[] = [];
-
-            spaces.forEach((space: any) => {
-              const keys = [
-                normalizeKey(space.GlobalId),
-                normalizeKey(space.Name),
-                normalizeKey(space.LongName),
-                normalizeKey(space.Tag),
-              ].filter(Boolean) as string[];
-
-              keys.forEach((key) => {
-                if (roomKeyMatches(key, roomSearchKeys)) {
-                  targetSpaceIds.push(space.expressID);
-                  console.log(`[IFC Preview] Salle trouvée: ${roomName} (ID: ${space.expressID})`);
-                }
-              });
+            // Ajouter à la scène + masquer (seul le subset sera visible)
+            scene.add(ifcModel);
+            const mats = Array.isArray(ifcModel.material) ? ifcModel.material : [ifcModel.material];
+            mats.forEach((m: any) => {
+              if (m) { m.transparent = true; m.opacity = 0; m.needsUpdate = true; }
             });
 
-            targetSpaceIds = Array.from(new Set(targetSpaceIds));
+            // Indexer les espaces (verbose=false → plus fiable)
+            let spaceIds: number[] = [];
+            try {
+              spaceIds = await loader.ifcManager.getAllItemsOfType(modelID, IFCSPACE, false);
+            } catch (e) {
+              console.warn('[IFC Preview] getAllItemsOfType:', e);
+            }
+            console.log(`[IFC Preview] ${spaceIds.length} IDs espaces`);
 
-            if (targetSpaceIds.length === 0) {
+            // Construire la spaceMap et l'enregistrer pour les prochains renders
+            const spaceMap = new Map<string, number[]>();
+            for (const id of spaceIds) {
+              if (disposed) return;
+              try {
+                const p = await loader.ifcManager.getItemProperties(modelID, id, false);
+                [p?.GlobalId, p?.Name, p?.LongName, p?.Tag].forEach((v: any) => {
+                  const k = normalizeKey(v);
+                  if (k) {
+                    const arr = spaceMap.get(k) ?? [];
+                    if (!arr.includes(id)) arr.push(id);
+                    spaceMap.set(k, arr);
+                  }
+                });
+              } catch (_) {}
+            }
+
+            // Enregistrer pour que BuildingView (s'il se monte plus tard) ne recharge pas
+            registerIFCLoader(loader, modelID, spaceMap);
+
+            if (disposed) return;
+
+            const targetIds = findInSpaceMap(spaceMap, roomName);
+            console.log(`[IFC Preview] ${targetIds.length} espaces trouvés pour ${roomName}`);
+
+            if (targetIds.length === 0) {
               setStatus('error');
               setError(`Salle ${roomName} non trouvée`);
               return;
             }
 
-            // Afficher uniquement la salle cible via subset
-            const selectionMaterial = new THREE.MeshStandardMaterial({
-              color: 0x4a90e2,
-              metalness: 0.2,
-              roughness: 0.8,
-            });
-
-            const subset = ifcModel.ifcManager.createSubset({
-              modelID: ifcModel.modelID,
-              ids: targetSpaceIds,
-              scene,
-              removePrevious: true,
-              material: selectionMaterial,
-            });
-
-            if (subset) {
-              // Zoom sur la salle
-              const box = new THREE.Box3().setFromObject(subset);
-              const center = box.getCenter(new THREE.Vector3());
-              const size = box.getSize(new THREE.Vector3());
-              const distance = Math.max(size.x, size.y, size.z) * 2.5;
-
-              cameraRef.current?.position.set(
-                center.x + distance * 0.6,
-                center.y + distance * 0.9,
-                center.z + distance * 1.1
-              );
-              cameraRef.current?.lookAt(center);
-              controlsRef.current?.target.copy(center);
-            }
-
-            setStatus('loaded');
+            applySubset(loader, modelID, targetIds);
           },
           (progress: any) => {
-            const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
-            console.log(`[IFC Preview] Chargement: ${percent}%`);
+            const pct = ((progress.loaded / progress.total) * 100).toFixed(1);
+            console.log(`[IFC Preview] Chargement: ${pct}%`);
           },
           (err: any) => {
             console.error('[IFC Preview] Erreur:', err);

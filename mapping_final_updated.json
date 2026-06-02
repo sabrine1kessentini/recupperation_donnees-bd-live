@@ -1,0 +1,1566 @@
+[
+  {
+    "ifc_global_id": "1oeLNWdyvD2xBpFQTGTp9a",
+    "ifc_name": "B118",
+    "ifc_long_name": "CONFERENCE ROOM 1",
+    "storey": "?",
+    "area_m2": 1427.30453803616,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 1,
+      "unicast_humidity": 1,
+      "unicast_occupancy": 1,
+      "unicast_luminosity": 1,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "1oeLNWdyvD2xBpFQTGTp9Y",
+    "ifc_name": "B117",
+    "ifc_long_name": "STORAGE",
+    "storey": "?",
+    "area_m2": 187.081295734998,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 8,
+      "unicast_humidity": 8,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "1oeLNWdyvD2xBpFQTGTp9W",
+    "ifc_name": "B119",
+    "ifc_long_name": "STORAGE",
+    "storey": "?",
+    "area_m2": 150.544846716557,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 9,
+      "unicast_humidity": 9,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0JaVFNY8150g9wOWKQH9Vm",
+    "ifc_name": "B113",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 224.774739583334,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 11,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quVb",
+    "ifc_name": "B120",
+    "ifc_long_name": "UTILITY",
+    "storey": "?",
+    "area_m2": 1463.67447916667,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 10,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quUy",
+    "ifc_name": "B108",
+    "ifc_long_name": "CONFERENCE ROOM 2",
+    "storey": "?",
+    "area_m2": 935.911675347227,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 2,
+      "unicast_humidity": 2,
+      "unicast_occupancy": 2,
+      "unicast_luminosity": 2,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quU_",
+    "ifc_name": "B109",
+    "ifc_long_name": "CONFERENCE ROOM 3",
+    "storey": "?",
+    "area_m2": 1030.61501736111,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 3,
+      "unicast_humidity": 3,
+      "unicast_occupancy": 3,
+      "unicast_luminosity": 3,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quP0",
+    "ifc_name": "B110",
+    "ifc_long_name": "CONFERENCE ROOM 4",
+    "storey": "?",
+    "area_m2": 531.821614583334,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 4,
+      "unicast_humidity": 4,
+      "unicast_occupancy": 4,
+      "unicast_luminosity": 4,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quP2",
+    "ifc_name": "B111",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 932.579631490312,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 7,
+      "unicast_humidity": 7,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quP4",
+    "ifc_name": "B106",
+    "ifc_long_name": "MAIN HALL",
+    "storey": "?",
+    "area_m2": 6710.62773054782,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 5,
+      "unicast_humidity": 5,
+      "unicast_occupancy": 5,
+      "unicast_luminosity": 5,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quP6",
+    "ifc_name": "B112",
+    "ifc_long_name": "RECEPTION",
+    "storey": "?",
+    "area_m2": 247.404694718293,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 6,
+      "unicast_humidity": 6,
+      "unicast_occupancy": 6,
+      "unicast_luminosity": 6,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quP8",
+    "ifc_name": "B114",
+    "ifc_long_name": "WC FOYER",
+    "storey": "?",
+    "area_m2": 226.433593750006,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 12,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quPA",
+    "ifc_name": "B116",
+    "ifc_long_name": "WOMENS",
+    "storey": "?",
+    "area_m2": 211.8916015625,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 13,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0uGek424j05BaSi7k8quPC",
+    "ifc_name": "B115",
+    "ifc_long_name": "MENS",
+    "storey": "?",
+    "area_m2": 213.134134234198,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 14,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDG",
+    "ifc_name": "B121",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 15,
+      "unicast_humidity": 15,
+      "unicast_occupancy": 15,
+      "unicast_luminosity": 15,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDJ",
+    "ifc_name": "B122",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 16,
+      "unicast_humidity": 16,
+      "unicast_occupancy": 16,
+      "unicast_luminosity": 16,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDL",
+    "ifc_name": "B123",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 17,
+      "unicast_humidity": 17,
+      "unicast_occupancy": 17,
+      "unicast_luminosity": 17,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDN",
+    "ifc_name": "B124",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510417,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 18,
+      "unicast_humidity": 18,
+      "unicast_occupancy": 18,
+      "unicast_luminosity": 18,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGD9",
+    "ifc_name": "B125",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 220.12478298613,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 21,
+      "unicast_humidity": 21,
+      "unicast_occupancy": 21,
+      "unicast_luminosity": 21,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDB",
+    "ifc_name": "B126",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 292.696393048321,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 22,
+      "unicast_humidity": 22,
+      "unicast_occupancy": 22,
+      "unicast_luminosity": 22,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDD",
+    "ifc_name": "B127",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510418,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 19,
+      "unicast_humidity": 19,
+      "unicast_occupancy": 19,
+      "unicast_luminosity": 19,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGDF",
+    "ifc_name": "B128",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510417,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 20,
+      "unicast_humidity": 20,
+      "unicast_occupancy": 20,
+      "unicast_luminosity": 20,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGD1",
+    "ifc_name": "B129",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 291.526480215566,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 23,
+      "unicast_humidity": 23,
+      "unicast_occupancy": 23,
+      "unicast_luminosity": 23,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGD3",
+    "ifc_name": "B130",
+    "ifc_long_name": "Room",
+    "storey": "?",
+    "area_m2": 252.534517505891,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 24,
+      "unicast_humidity": 24,
+      "unicast_occupancy": 24,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "39xeVIdXb0Oeui8c6ndGD5",
+    "ifc_name": "B131",
+    "ifc_long_name": "Room",
+    "storey": "?",
+    "area_m2": 174.816370081022,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 25,
+      "unicast_humidity": 25,
+      "unicast_occupancy": 25,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0PeKSAvI59PfDaeCq6ElAN",
+    "ifc_name": "B132",
+    "ifc_long_name": "CONFERENCE ROOM 1",
+    "storey": "?",
+    "area_m2": 857.488608911919,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 26,
+      "unicast_humidity": 26,
+      "unicast_occupancy": 26,
+      "unicast_luminosity": 26,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0PeKSAvI59PfDaeCq6ElAJ",
+    "ifc_name": "B134",
+    "ifc_long_name": "CONFERENCE ROOM 3",
+    "storey": "?",
+    "area_m2": 857.48860891192,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 28,
+      "unicast_humidity": 28,
+      "unicast_occupancy": 28,
+      "unicast_luminosity": 28,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0PeKSAvI59PfDaeCq6ElAH",
+    "ifc_name": "B135",
+    "ifc_long_name": "CONFERENCE ROOM 4",
+    "storey": "?",
+    "area_m2": 1219.463682743,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 29,
+      "unicast_humidity": 29,
+      "unicast_occupancy": 29,
+      "unicast_luminosity": 29,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxT",
+    "ifc_name": "B137",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 243.026936848958,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 30,
+      "unicast_humidity": 30,
+      "unicast_occupancy": 30,
+      "unicast_luminosity": 30,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxR",
+    "ifc_name": "B138",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 242.758951822916,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 31,
+      "unicast_humidity": 31,
+      "unicast_occupancy": 31,
+      "unicast_luminosity": 31,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxP",
+    "ifc_name": "B139",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 238.72960069443,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 32,
+      "unicast_humidity": 32,
+      "unicast_occupancy": 32,
+      "unicast_luminosity": 32,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$Ox5",
+    "ifc_name": "B140",
+    "ifc_long_name": "Entry",
+    "storey": "?",
+    "area_m2": 1113.61342352815,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxF",
+    "ifc_name": "B142",
+    "ifc_long_name": "Women",
+    "storey": "?",
+    "area_m2": 209.94954427082,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxD",
+    "ifc_name": "B143",
+    "ifc_long_name": "Men",
+    "storey": "?",
+    "area_m2": 191.409505208368,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0jdEFTa3r2xhGxvrW4$OxB",
+    "ifc_name": "B144",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 131.083333333331,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "15E8uh5azAGPtKsV0k1U2l",
+    "ifc_name": "B146",
+    "ifc_long_name": "Electrical",
+    "storey": "?",
+    "area_m2": 255.680989583332,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0AVVlLIDbCvOgtmmM8Bw76",
+    "ifc_name": "B147",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 4417.41433728567,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "16W6cLvsb3jBoxMDVIAJX9",
+    "ifc_name": "B148",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 2393.76095100768,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "16W6cLvsb3jBoxMDVIAJX6",
+    "ifc_name": "B149",
+    "ifc_long_name": "Stair",
+    "storey": "?",
+    "area_m2": 519.702821086962,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "24KhfkJI5FJ9d$VCsZuwRp",
+    "ifc_name": "B151",
+    "ifc_long_name": "Stair",
+    "storey": "?",
+    "area_m2": 963.666666666674,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "2gt9UqKnT4DvHlrgGjUXdt",
+    "ifc_name": "B136",
+    "ifc_long_name": "WC FOYER",
+    "storey": "?",
+    "area_m2": 75.4778645833279,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "2gt9UqKnT4DvHlrgGjUXdu",
+    "ifc_name": "B141",
+    "ifc_long_name": "UTILITY",
+    "storey": "?",
+    "area_m2": 138.396375868058,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 41,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "2gt9UqKnT4DvHlrgGjUXd6",
+    "ifc_name": "B150",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 196.316327646598,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 45,
+      "unicast_humidity": null,
+      "unicast_occupancy": 45,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "2gt9UqKnT4DvHlrgGjUXd4",
+    "ifc_name": "B152",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 198.788815582576,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 47,
+      "unicast_humidity": null,
+      "unicast_occupancy": 47,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0SmY8owzL2ReIRyR3Lic4i",
+    "ifc_name": "B133",
+    "ifc_long_name": "CONFERENCE ROOM 2",
+    "storey": "?",
+    "area_m2": 857.488608911923,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 27,
+      "unicast_humidity": 27,
+      "unicast_occupancy": 27,
+      "unicast_luminosity": 27,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "2jnwSeFHz9bAhfugdwq2v3",
+    "ifc_name": "B154",
+    "ifc_long_name": "Toilet",
+    "storey": "?",
+    "area_m2": 115.797797309027,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 36,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKV$",
+    "ifc_name": "B118",
+    "ifc_long_name": "CONFERENCE ROOM 1",
+    "storey": "?",
+    "area_m2": 1427.30453803616,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 51,
+      "unicast_humidity": 51,
+      "unicast_occupancy": 51,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKV_",
+    "ifc_name": "B117",
+    "ifc_long_name": "STORAGE",
+    "storey": "?",
+    "area_m2": 187.081295734998,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVv",
+    "ifc_name": "B119",
+    "ifc_long_name": "STORAGE",
+    "storey": "?",
+    "area_m2": 150.544846716557,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVu",
+    "ifc_name": "B113",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 224.774739583334,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVx",
+    "ifc_name": "B120",
+    "ifc_long_name": "UTILITY",
+    "storey": "?",
+    "area_m2": 1463.67447916667,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVw",
+    "ifc_name": "B108",
+    "ifc_long_name": "CONFERENCE ROOM 2",
+    "storey": "?",
+    "area_m2": 935.911675347227,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 52,
+      "unicast_humidity": null,
+      "unicast_occupancy": 52,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVr",
+    "ifc_name": "B109",
+    "ifc_long_name": "CONFERENCE ROOM 3",
+    "storey": "?",
+    "area_m2": 1030.61501736111,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 53,
+      "unicast_humidity": null,
+      "unicast_occupancy": 53,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVq",
+    "ifc_name": "B110",
+    "ifc_long_name": "CONFERENCE ROOM 4",
+    "storey": "?",
+    "area_m2": 531.821614583334,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 54,
+      "unicast_humidity": null,
+      "unicast_occupancy": 54,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVt",
+    "ifc_name": "B111",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 932.579631490312,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVs",
+    "ifc_name": "B106",
+    "ifc_long_name": "MAIN HALL",
+    "storey": "?",
+    "area_m2": 6710.62773054782,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 55,
+      "unicast_humidity": null,
+      "unicast_occupancy": 55,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVn",
+    "ifc_name": "B112",
+    "ifc_long_name": "RECEPTION",
+    "storey": "?",
+    "area_m2": 247.404694718293,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVm",
+    "ifc_name": "B114",
+    "ifc_long_name": "WC FOYER",
+    "storey": "?",
+    "area_m2": 226.433593750006,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVp",
+    "ifc_name": "B116",
+    "ifc_long_name": "WOMENS",
+    "storey": "?",
+    "area_m2": 211.8916015625,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVo",
+    "ifc_name": "B115",
+    "ifc_long_name": "MENS",
+    "storey": "?",
+    "area_m2": 213.134134234198,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVj",
+    "ifc_name": "B121",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVi",
+    "ifc_name": "B122",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVl",
+    "ifc_name": "B123",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510416,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVk",
+    "ifc_name": "B124",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510417,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVf",
+    "ifc_name": "B125",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 220.12478298613,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVe",
+    "ifc_name": "B126",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 292.696393048321,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVh",
+    "ifc_name": "B127",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510418,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVg",
+    "ifc_name": "B128",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 129.371256510417,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVb",
+    "ifc_name": "B129",
+    "ifc_long_name": "Conference Room",
+    "storey": "?",
+    "area_m2": 291.526480215566,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVa",
+    "ifc_name": "B130",
+    "ifc_long_name": "Room",
+    "storey": "?",
+    "area_m2": 252.534517505891,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVd",
+    "ifc_name": "B131",
+    "ifc_long_name": "Room",
+    "storey": "?",
+    "area_m2": 174.816370081022,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVc",
+    "ifc_name": "B132",
+    "ifc_long_name": "CONFERENCE ROOM 1",
+    "storey": "?",
+    "area_m2": 857.488608911919,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 56,
+      "unicast_humidity": null,
+      "unicast_occupancy": 56,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVX",
+    "ifc_name": "B134",
+    "ifc_long_name": "CONFERENCE ROOM 3",
+    "storey": "?",
+    "area_m2": 857.48860891192,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 58,
+      "unicast_humidity": null,
+      "unicast_occupancy": 58,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVW",
+    "ifc_name": "B135",
+    "ifc_long_name": "CONFERENCE ROOM 4",
+    "storey": "?",
+    "area_m2": 1219.463682743,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 59,
+      "unicast_humidity": null,
+      "unicast_occupancy": 59,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVZ",
+    "ifc_name": "B137",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 243.026936848958,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKVY",
+    "ifc_name": "B138",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 242.758951822916,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUT",
+    "ifc_name": "B139",
+    "ifc_long_name": "Office",
+    "storey": "?",
+    "area_m2": 238.72960069443,
+    "waveon": {
+      "id_network": null,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": false
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUS",
+    "ifc_name": "B140",
+    "ifc_long_name": "Entry",
+    "storey": "?",
+    "area_m2": 1113.61342352815,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 33,
+      "unicast_humidity": 33,
+      "unicast_occupancy": 33,
+      "unicast_luminosity": 33,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUV",
+    "ifc_name": "B142",
+    "ifc_long_name": "Women",
+    "storey": "?",
+    "area_m2": 209.94954427082,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 34,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUU",
+    "ifc_name": "B143",
+    "ifc_long_name": "Men",
+    "storey": "?",
+    "area_m2": 191.409505208368,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 35,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUP",
+    "ifc_name": "B144",
+    "ifc_long_name": "SERVICE",
+    "storey": "?",
+    "area_m2": 131.083333333331,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 39,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUR",
+    "ifc_name": "B146",
+    "ifc_long_name": "Electrical",
+    "storey": "?",
+    "area_m2": 255.680989583332,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 40,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUQ",
+    "ifc_name": "B147",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 4417.41433728567,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 43,
+      "unicast_humidity": null,
+      "unicast_occupancy": 43,
+      "unicast_luminosity": 43,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUL",
+    "ifc_name": "B148",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 2393.76095100768,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 44,
+      "unicast_humidity": null,
+      "unicast_occupancy": 44,
+      "unicast_luminosity": null,
+      "unicast_energy": 66000,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUK",
+    "ifc_name": "B149",
+    "ifc_long_name": "Stair",
+    "storey": "?",
+    "area_m2": 519.702821086962,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 49,
+      "unicast_luminosity": 49,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUN",
+    "ifc_name": "B151",
+    "ifc_long_name": "Stair",
+    "storey": "?",
+    "area_m2": 963.666666666674,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 50,
+      "unicast_luminosity": 50,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUM",
+    "ifc_name": "B136",
+    "ifc_long_name": "WC FOYER",
+    "storey": "?",
+    "area_m2": 75.4778645833279,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 38,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUH",
+    "ifc_name": "B141",
+    "ifc_long_name": "UTILITY",
+    "storey": "?",
+    "area_m2": 138.396375868058,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 42,
+      "unicast_humidity": null,
+      "unicast_occupancy": null,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUG",
+    "ifc_name": "B150",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 196.316327646598,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 46,
+      "unicast_humidity": null,
+      "unicast_occupancy": 46,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUJ",
+    "ifc_name": "B152",
+    "ifc_long_name": "Circulation",
+    "storey": "?",
+    "area_m2": 198.788815582576,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 48,
+      "unicast_humidity": null,
+      "unicast_occupancy": 48,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUI",
+    "ifc_name": "B133",
+    "ifc_long_name": "CONFERENCE ROOM 2",
+    "storey": "?",
+    "area_m2": 857.488608911923,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": 57,
+      "unicast_humidity": null,
+      "unicast_occupancy": 57,
+      "unicast_luminosity": null,
+      "unicast_energy": 66001,
+      "unicast_flow": null
+    },
+    "mapped": true
+  },
+  {
+    "ifc_global_id": "0mnyWlb4b5Je_kNpm0jKUD",
+    "ifc_name": "B154",
+    "ifc_long_name": "Toilet",
+    "storey": "?",
+    "area_m2": 115.797797309027,
+    "waveon": {
+      "id_network": 1,
+      "unicast_temperature": null,
+      "unicast_humidity": null,
+      "unicast_occupancy": 37,
+      "unicast_luminosity": null,
+      "unicast_energy": null,
+      "unicast_flow": 66300
+    },
+    "mapped": true
+  }
+]

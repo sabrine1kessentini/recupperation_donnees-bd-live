@@ -11,6 +11,7 @@ import { OccupancyView } from './components/OccupancyView';
 import { AuthView } from './components/AuthView';
 import { ReservationView } from './components/ReservationView';
 import { RoomView } from './components/RoomView';
+import { ComfortView } from './components/ComfortView';
 import { isAuthenticated as checkAuth, getRoles } from '../utils/auth';
 
 type DashboardProps = {
@@ -67,6 +68,8 @@ export default function App() {
         return <ReservationView />;
       case 'digitalTwin':
         return <DigitalTwinView />;
+      case 'comfort':
+        return <ComfortView />;
       default:
         return <DefaultDashboard onOpenRoom={(roomName) => setActiveView(`room-${roomName.toLowerCase()}`)} />;
     }

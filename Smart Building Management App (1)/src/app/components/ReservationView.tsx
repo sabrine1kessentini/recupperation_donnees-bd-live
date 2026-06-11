@@ -66,10 +66,13 @@ const toRoom = (room: ReservationRoomDto): MeetingRoom => ({
 
 /**
  * Tarif horaire basé sur la superficie de la salle :
- *   100–300 m²  →  100 DT/h   |   300–700 m²   →  200 DT/h
+ *   < 300 m²    →  100 DT/h   |   300–700 m²   →  200 DT/h
  *   700–1500 m² →  300 DT/h   |   > 1500 m²    →  500 DT/h
- * Heure de pointe (8h–18h jours ouvrables) = base + 50 DT/h
+ * Heures de pointe (8h–12h et 14h–18h) = tarif de base.
+ * Heures hors pointe (avant 8h, 12h–14h, après 18h) = base + 50 DT/h.
  */
+const isPeakHour = (hour: number) => (hour >= 8 && hour < 12) || (hour >= 14 && hour < 18);
+
 const getHourlyRange = (areaM2: number | null) => {
   const a = areaM2 ?? 0;
   let base: number;
@@ -77,12 +80,12 @@ const getHourlyRange = (areaM2: number | null) => {
   else if (a >= 700)  base = 300;
   else if (a >= 300)  base = 200;
   else                base = 100;
-  return { offPeak: base, peak: base + 50 };
+  return { peak: base, offPeak: base + 50 };
 };
 
 const ENERGY_RATE_DT    = 0.18;   // DT/kWh
-const MIN_KWH_PER_M2_H = 0.025;  // 25 W/m² — charge minimale (éclairage seul)
-const MAX_KWH_PER_M2_H = 0.10;   // 100 W/m² — charge maximale (CVC + équipements)
+const MIN_KWH_PER_M2_H = 0.025;  // 25 W/m²  — charge minimale (éclairage seul)
+const MAX_KWH_PER_M2_H = 0.15;   // 150 W/m² — charge maximale (CVC + équipements + surcharge)
 
 const getEnergyRange = (areaM2: number | null) => {
   const a       = areaM2 ?? 20;
@@ -212,6 +215,7 @@ export function ReservationView() {
           roomName: selectedRoom.code,
           startDatetime: `${date}T${startTime}`,
           endDatetime: `${date}T${endTime}`,
+          areaM2: selectedRoom.areaM2,
         });
         if (reqId === latestPricingReqRef.current) { setPricingEstimate(est); setPricingError(null); }
       } catch {
@@ -369,7 +373,7 @@ export function ReservationView() {
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-zinc-500">Location</span>
                     <span className="text-[11px] font-semibold text-amber-700">
-                      {range.offPeak} – {range.peak} DT
+                      {range.peak} – {range.offPeak} DT
                     </span>
                   </div>
 
@@ -385,11 +389,11 @@ export function ReservationView() {
                   <div className="border-t border-amber-200 pt-1.5 flex items-center justify-between">
                     <span className="text-[10px] text-zinc-600 font-medium">Total estimé</span>
                     <span className="text-sm font-bold text-amber-700">
-                      ~{(range.offPeak + energy.minCost).toFixed(0)} – ~{(range.peak + energy.maxCost).toFixed(0)} DT/h
+                      ~{(range.peak + energy.minCost).toFixed(0)} – ~{(range.offPeak + energy.maxCost).toFixed(0)} DT/h
                     </span>
                   </div>
 
-                  <p className="text-[9px] text-amber-500">Hors-pointe / Pointe (+50 DT/h)</p>
+                  <p className="text-[9px] text-amber-500">Pointe (8h-12h, 14h-18h) / Hors-pointe (+50 DT/h)</p>
                 </div>
 
                 <button className="w-full flex items-center justify-center gap-2 rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300 transition-all group-hover:border-[#f4b400]/40 group-hover:bg-amber-50/50">
@@ -481,43 +485,67 @@ export function ReservationView() {
                     {/* Location row */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="rounded-xl bg-white border border-amber-100 p-3">
-                        <p className="text-[10px] text-zinc-400 mb-1">Location · Hors-pointe</p>
+                        <p className="text-[10px] text-zinc-400 mb-1">Location · Pointe (8h-12h, 14h-18h)</p>
                         <p className="text-2xl font-bold text-amber-600">
-                          {range.offPeak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                          {range.peak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
                         </p>
                       </div>
                       <div className="rounded-xl bg-white border border-amber-100 p-3">
-                        <p className="text-[10px] text-zinc-400 mb-1">Location · Pointe (+50 DT/h)</p>
+                        <p className="text-[10px] text-zinc-400 mb-1">Location · Hors-pointe (+50 DT/h)</p>
                         <p className="text-2xl font-bold text-amber-600">
-                          {range.peak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                          {range.offPeak} <span className="text-sm font-normal text-zinc-400">DT/h</span>
                         </p>
                       </div>
                     </div>
 
                     {/* Energy row */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="rounded-xl bg-white border border-slate-100 p-3">
-                        <p className="text-[10px] text-zinc-400 mb-1">Énergie min (~{energy.minKwh} kWh)</p>
-                        <p className="text-2xl font-bold text-zinc-600">
-                          ~{energy.minCost} <span className="text-sm font-normal text-zinc-400">DT/h</span>
+                    {pricingEstimate ? (
+                      <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider mb-0.5">⚡ Prédiction IA</p>
+                          <p className="text-[10px] text-zinc-500">{pricingEstimate.predicted_kwh} kWh × 0,18 DT/kWh</p>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-700">
+                          {pricingEstimate.energy_cost_dt}
+                          <span className="text-sm font-normal text-zinc-400 ml-1">DT</span>
                         </p>
                       </div>
-                      <div className="rounded-xl bg-white border border-slate-100 p-3">
-                        <p className="text-[10px] text-zinc-400 mb-1">Énergie max (~{energy.maxKwh} kWh)</p>
-                        <p className="text-2xl font-bold text-zinc-600">
-                          ~{energy.maxCost} <span className="text-sm font-normal text-zinc-400">DT/h</span>
-                        </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-xl bg-white border border-slate-100 p-3">
+                          <p className="text-[10px] text-zinc-400 mb-1">Énergie min · théorique ({energy.minKwh} kWh/h)</p>
+                          <p className="text-2xl font-bold text-zinc-400">
+                            ~{energy.minCost} <span className="text-sm font-normal text-zinc-300">DT/h</span>
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-white border border-slate-100 p-3">
+                          <p className="text-[10px] text-zinc-400 mb-1">Énergie max · théorique ({energy.maxKwh} kWh/h)</p>
+                          <p className="text-2xl font-bold text-zinc-400">
+                            ~{energy.maxCost} <span className="text-sm font-normal text-zinc-300">DT/h</span>
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Total row */}
                     <div className="rounded-xl bg-amber-100/60 border border-amber-200 px-4 py-3 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-zinc-700">Total estimé / heure</span>
+                      <span className="text-sm font-semibold text-zinc-700">
+                        {pricingEstimate ? 'Total estimé (créneau)' : 'Total estimé / heure'}
+                      </span>
                       <span className="text-xl font-bold text-amber-700">
-                        ~{(range.offPeak + energy.minCost).toFixed(0)}
-                        <span className="text-zinc-400 font-normal text-sm mx-1.5">–</span>
-                        ~{(range.peak + energy.maxCost).toFixed(0)}
-                        <span className="text-sm font-normal text-zinc-400 ml-1">DT/h</span>
+                        {pricingEstimate ? (
+                          <>
+                            {pricingEstimate.total_price_dt}
+                            <span className="text-sm font-normal text-zinc-400 ml-1">DT</span>
+                          </>
+                        ) : (
+                          <>
+                            ~{(range.peak + energy.minCost).toFixed(0)}
+                            <span className="text-zinc-400 font-normal text-sm mx-1.5">–</span>
+                            ~{(range.offPeak + energy.maxCost).toFixed(0)}
+                            <span className="text-sm font-normal text-zinc-400 ml-1">DT/h</span>
+                          </>
+                        )}
                       </span>
                     </div>
 
@@ -529,16 +557,18 @@ export function ReservationView() {
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
                           <span>
                             <strong className="text-zinc-700">Location :</strong> tarif basé sur la superficie —
-                            100–300 m² = 100 DT/h · 300–700 m² = 200 DT/h · 700–1500 m² = 300 DT/h · +1500 m² = 500 DT/h.
-                            Pointe (8h–18h jours ouvrables) : +50 DT/h.
+                            &lt;300 m² = 100 DT/h · 300–700 m² = 200 DT/h · 700–1500 m² = 300 DT/h · &gt;1500 m² = 500 DT/h.
+                            Pointe (8h–12h et 14h–18h) = tarif de base. Hors-pointe = +50 DT/h.
                           </span>
                         </div>
                         <div className="flex items-start gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
                           <span>
-                            <strong className="text-zinc-700">Énergie :</strong> entre {energy.minKwh} kWh/h (charge minimale)
-                            et {energy.maxKwh} kWh/h (pleine charge CVC) × 0,18 DT/kWh
-                            = ~{energy.minCost} – ~{energy.maxCost} DT/h.
+                            <strong className="text-zinc-700">Énergie :</strong>{' '}
+                            {pricingEstimate
+                              ? <>prédiction IA = <strong className="text-blue-700">{pricingEstimate.predicted_kwh} kWh</strong> × 0,18 DT/kWh = <strong className="text-blue-700">{pricingEstimate.energy_cost_dt} DT</strong> (coût réel prédit).</>
+                              : <>fourchette théorique : {energy.minKwh}–{energy.maxKwh} kWh/h × 0,18 DT/kWh = ~{energy.minCost}–~{energy.maxCost} DT/h. Sélectionnez un créneau pour la prédiction IA.</>
+                            }
                           </span>
                         </div>
                         <div className="flex items-start gap-2">

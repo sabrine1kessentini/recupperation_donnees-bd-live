@@ -475,14 +475,13 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">
             <Zap className="w-4 h-4 text-amber-500" />
-            <h3 className="font-semibold">Énergie totale (semaine)</h3>
+            <h3 className="font-semibold">Énergie totale </h3>
           </div>
           <p className="text-4xl font-bold text-zinc-800">
-            {isEnergyLoading ? '...' : `${totalEnergy} MWh`}
+            {isEnergyLoading ? '...' : `${totalEnergy} KWh`}
           </p>
           {energyComparison && (
             <>
-              <p className="text-xs text-zinc-500 mt-1">{(energyComparison.currentTotalRaw / 1000000).toFixed(1)} GJ consommés</p>
               <div className="mt-3 flex items-center gap-2">
                 {energyComparison.percentageChange >= 0 ? (
                   <>
@@ -504,7 +503,7 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
 <article className="col-span-4 rounded-3xl bg-white/75 p-5">
   <div className="flex items-center gap-2 text-zinc-700 mb-3">
     <Thermometer className="w-4 h-4 text-orange-400" />
-    <h3 className="font-semibold">Cout Energetique (semaine)</h3>
+    <h3 className="font-semibold">Cout Energetique </h3>
   </div>
 
   <p className="text-4xl font-bold text-zinc-800">
@@ -516,18 +515,12 @@ export function DashboardView({ onOpenRoom }: DashboardViewProps) {
         ).toFixed(0)} DT`
       : '--'}
   </p>
-
-  {energyComparison && (
-    <p className="text-xs text-zinc-500 mt-1">
-      Basé sur {totalEnergy} kWh @ 0.18 DT/kWh
-    </p>
-  )}
 </article>
 
         <article className="col-span-4 rounded-3xl bg-white/75 p-5">
           <div className="flex items-center gap-2 text-zinc-700 mb-3">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            <h3 className="font-semibold">Alertes capteurs (semaine)</h3>
+            <h3 className="font-semibold">Alertes capteurs</h3>
           </div>
           <p className="text-4xl font-bold text-zinc-800">
             {isAlertsLoading ? '...' : weeklyAlerts.length}

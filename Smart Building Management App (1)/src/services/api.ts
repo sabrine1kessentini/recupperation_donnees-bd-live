@@ -64,6 +64,7 @@ export async function estimateReservationPrice(
     roomName: string;
     startDatetime: string;
     endDatetime: string;
+    areaM2?: number | null;
   },
   signal?: AbortSignal
 ): Promise<PricingEstimateDto> {
@@ -84,6 +85,7 @@ export async function estimateReservationPrice(
       room_name: payload.roomName,
       start_datetime: payload.startDatetime,
       end_datetime: payload.endDatetime,
+      area_m2: payload.areaM2 ?? null,
     }),
   });
 
@@ -418,6 +420,9 @@ export type ComfortAlert = {
 export type RoomComfortState = {
   room: string;
   timestamp: string;
+  data_missing?: boolean;
+  data_stale?: boolean;
+  data_age_minutes?: number | null;
   sensors: {
     temperature: number | null;
     humidity: number | null;
